@@ -1,0 +1,3017 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>傅里叶变换 · 圆上圆绘图</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --panel: #131a2b;
+    --line: #22304d;
+    --text: #dbe6ff;
+    --muted: #8b9bbd;
+    --accent: #00e5ff;
+    --accent2: #7c4dff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: radial-gradient(1200px 700px at 50% -10%, #16203a 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  body {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 18px 16px 10px; gap: 14px;
+    min-height: 100vh;
+  }
+  header { text-align: center; }
+  header h1 {
+    margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 1px;
+    background: linear-gradient(90deg, var(--accent), #8fe9ff, var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+    gap: 10px; width: 100%; max-width: 1100px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 14px;
+  }
+  .group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .group + .group { border-left: 1px solid var(--line); padding-left: 14px; margin-left: 4px; }
+  .info {
+    color: var(--accent); font-size: 12px; font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* 绘图（组合）工具栏 */
+  .drawbar {
+    display: none; flex-wrap: wrap; justify-content: center; align-items: center;
+    gap: 8px; width: 100%; max-width: 1100px;
+    background: linear-gradient(180deg, #17223c, var(--panel));
+    border: 1px solid var(--accent2); border-radius: 14px; padding: 10px 14px;
+  }
+  .drawbar.show { display: flex; }
+  .drawbar .group + .group { border-left: 1px solid var(--line); padding-left: 12px; margin-left: 2px; }
+  .drawbar button { padding: 6px 10px; font-size: 12.5px; }
+  .drawbar .chk {
+    font-size: 12.5px; color: var(--muted);
+    display: flex; align-items: center; gap: 5px; cursor: pointer;
+  }
+  .drawbar .chk input { accent-color: var(--accent); }
+
+  button {
+    cursor: pointer; border: 1px solid var(--line); border-radius: 9px;
+    background: #1a2438; color: var(--text); padding: 7px 12px; font-size: 13px;
+    transition: transform .06s ease, background .15s ease, border-color .15s ease;
+  }
+  button:hover { border-color: var(--accent); }
+  button:active { transform: scale(.96); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.active {
+    background: linear-gradient(135deg, rgba(0,229,255,.22), rgba(124,77,255,.22));
+    border-color: var(--accent); color: #fff;
+  }
+  button.accent { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+  button.accent:hover { filter: brightness(1.1); }
+
+  .sliders { display: flex; flex-wrap: wrap; gap: 16px; }
+  .sliders label {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted);
+  }
+  .sliders span { min-width: 42px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 120px; accent-color: var(--accent); cursor: pointer; }
+  .sliders input[type=number] {
+    width: 66px; background: #1a2438; color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px;
+    font-size: 13px; font-variant-numeric: tabular-nums;
+  }
+  .sliders input[type=number]:focus { outline: none; border-color: var(--accent); }
+
+  .toggles label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .toggles input { accent-color: var(--accent); }
+  select {
+    background: #1a2438; color: var(--text); border: 1px solid var(--line);
+    border-radius: 9px; padding: 6px 8px; font-size: 13px; cursor: pointer;
+  }
+  select:hover { border-color: var(--accent); }
+  select:focus { outline: none; border-color: var(--accent); }
+
+  .stage { position: relative; width: 100%; max-width: 1100px; flex: 1 1 auto; display: flex; justify-content: center; }
+  body.focus header, body.focus footer { display: none; }
+  body.focus { padding: 8px 10px 6px; gap: 8px; }
+  body.focus .controls { padding: 8px 12px; }
+  canvas {
+    width: 100%; height: 100%;
+    display: block; border-radius: 16px;
+    border: 1px solid var(--line);
+    background: radial-gradient(700px 500px at 50% 50%, #101828 0%, #0a0f1c 75%);
+    cursor: crosshair; touch-action: none;
+  }
+  .hint {
+    position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
+    background: rgba(10,15,28,.82); border: 1px solid var(--accent); border-radius: 999px;
+    color: var(--accent); padding: 8px 18px; font-size: 13px; white-space: nowrap;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease; max-width: 94%;
+  }
+  .hint.show { opacity: 1; }
+  .toast {
+    position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
+    background: rgba(10,15,28,.9); border: 1px solid var(--accent2); border-radius: 10px;
+    color: var(--text); padding: 8px 16px; font-size: 13px; max-width: 92%;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease;
+  }
+  .toast.show { opacity: 1; }
+
+  footer { color: var(--muted); font-size: 12px; text-align: center; max-width: 1100px; }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(5,8,16,.74); backdrop-filter: blur(2px);
+    opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 50;
+  }
+  .overlay.show { opacity: 1; pointer-events: auto; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 24px 30px; text-align: center; min-width: 300px; max-width: 92vw;
+  }
+  .card h3 { margin: 0 0 16px; font-size: 16px; font-weight: 600; }
+  .spinner {
+    width: 36px; height: 36px; margin: 0 auto 14px; border-radius: 50%;
+    border: 3px solid var(--line); border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #overlayText { color: var(--text); font-size: 14px; margin-bottom: 14px; }
+  .bar { height: 8px; background: #1a2438; border-radius: 999px; overflow: hidden; }
+  #progressBar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 999px; transition: width .1s ease;
+  }
+  #btnCancelRec { margin-top: 14px; display: none; }
+
+  .field { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 13px; text-align: left; }
+  .field > span:first-child { width: 48px; text-align: right; color: var(--muted); flex-shrink: 0; }
+  .field label { display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; }
+  .field input[type=radio] { accent-color: var(--accent); }
+  .field select {
+    background: #1a2438; color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 5px 8px; font-size: 13px; flex: 1;
+  }
+  .note { color: var(--muted); font-size: 12px; margin: 10px 0 14px; text-align: left; }
+  .row { display: flex; gap: 10px; justify-content: flex-end; }
+  .row button { padding: 8px 16px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>傅里叶变换 · 圆上圆绘图</h1>
+    <p>用许多个不停旋转的圆拼出图案 —— 每条独立线条由各自的一组圆绘制</p>
+  </header>
+
+  <div class="controls">
+    <div class="group" id="presets">
+      <button data-preset="heart" class="active">❤ 心形</button>
+      <button data-preset="star">★ 五角星</button>
+      <button data-preset="cardioid">♡ 心脏线</button>
+      <button data-preset="rose5">✿ 玫瑰线·5瓣</button>
+      <button data-preset="rose8">❁ 玫瑰线·8瓣</button>
+      <button data-preset="deltoid">◮ 内摆线·三尖</button>
+      <button data-preset="astroid">✦ 内摆线·四尖</button>
+      <button data-preset="epicycloid">✧ 外摆线·三尖</button>
+      <button data-preset="spiral">🌀 螺线</button>
+      <button data-preset="lissajous">≈ 利萨茹</button>
+      <button data-preset="infinity">∞ 无穷</button>
+      <button data-preset="square">▢ 正方形</button>
+      <button data-preset="triangle">△ 三角形</button>
+      <button data-preset="pentagon">⬠ 五边形</button>
+      <button data-preset="smiley">☺ 笑脸（多线）</button>
+    </div>
+
+    <div class="group">
+      <button id="btnDraw" class="accent">✏️ 绘图 / 组合</button>
+      <button id="btnUpload">🖼 上传图案</button>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+      <select id="recogMode" title="上传图片时的线条识别方式">
+        <option value="auto" selected>识别：自动</option>
+        <option value="contour">识别：轮廓（实心图案）</option>
+        <option value="line">识别：线稿（中心线）</option>
+      </select>
+      <select id="detailSel" title="上传识别时保留的线条数量：越多越能还原发丝等细节">
+        <option value="60">细节 标准</option>
+        <option value="120" selected>细节 高</option>
+        <option value="240">细节 极高</option>
+        <option value="400">细节 极限</option>
+      </select>
+      <button id="btnSave">💾 保存作品</button>
+      <button id="btnLoad">📂 载入作品</button>
+      <input type="file" id="loadInput" accept=".json,application/json" hidden>
+      <button id="btnExport">📤 导出</button>
+      <button id="btnReplay">↻ 重新绘制</button>
+      <button id="btnClear">🧹 清空轨迹</button>
+      <button id="btnPlay">⏸ 暂停</button>
+    </div>
+
+    <div class="group sliders">
+      <label>每条线的圆数
+        <input type="range" id="circles" min="1" max="2048" step="1" value="40" title="拖动选择，最大 2048">
+        <input type="number" id="circlesNum" min="1" max="2048" step="1" value="40" title="直接输入 1–2048">
+      </label>
+      <label>速度 <span id="speedLabel">1.0×</span>
+        <input type="range" id="speed" min="0.2" max="5" step="0.1" value="1">
+      </label>
+    </div>
+
+    <div class="group toggles">
+      <label><input type="checkbox" id="showCircles" checked> 显示圆</label>
+      <label><input type="checkbox" id="showLabels" checked> 标注</label>
+      <label><input type="checkbox" id="showTrace" checked> 显示轨迹</label>
+      <label><input type="checkbox" id="showPreview"> 线条预览</label>
+      <span id="shapeInfo" class="info"></span>
+    </div>
+
+    <div class="group">
+      <select id="aspectSel" title="画幅比例">
+        <option value="auto">画幅 自适应</option>
+        <option value="1:1">1:1 方形</option>
+        <option value="4:3">4:3</option>
+        <option value="3:4">3:4 竖版</option>
+        <option value="16:9">16:9</option>
+        <option value="9:16">9:16 竖版</option>
+        <option value="2:1">2:1 宽幅</option>
+      </select>
+      <select id="widthSel" title="画幅最大宽度">
+        <option value="1100">标准画幅</option>
+        <option value="1600">宽画幅</option>
+        <option value="2200">超宽画幅</option>
+        <option value="3200">超宽+</option>
+        <option value="0">全窗口</option>
+      </select>
+      <button id="btnZoomOut" title="缩小视图（滚轮也可）">−</button>
+      <span id="zoomInfo" class="info" title="视图缩放比例">100%</span>
+      <button id="btnZoomIn" title="放大视图（滚轮也可）">＋</button>
+      <button id="btnZoomFit" title="适应画布，视图复位（滚轮双击亦可）">适应</button>
+      <button id="btnFocus" title="专注模式：隐藏页头页脚，画布最大化（Esc 退出）">⛶ 专注</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="canvas"></canvas>
+    <div id="hint" class="hint">拖动即可绘制；滚轮缩放、空格或中键拖动平移；Shift 等比、Alt 从中心</div>
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <!-- 绘图（组合）工具栏：仅在绘图模式显示 -->
+  <div class="drawbar" id="drawBar">
+    <div class="group" id="tools">
+      <button data-tool="select" title="点击选中；拖动移动；拖角上的方块缩放（Shift 等比 / Alt 以中心）">🖱 选择/移动</button>
+      <button data-tool="free" class="active" title="自由画笔">✎ 画笔</button>
+      <button data-tool="eraser" title="拖动擦除线条（可擦掉上传图案的部分线条）">⌫ 橡皮擦</button>
+      <button data-tool="line" title="线段（Shift 锁定 45°）">╱ 线段</button>
+      <button data-tool="arc" title="弧线">◜ 弧线</button>
+      <button data-tool="wave" title="波浪线">〜 波浪</button>
+      <button data-tool="spiral" title="螺线">🌀 螺线</button>
+      <button data-tool="arrow" title="箭头（Shift 锁定 45°，末端大小可调）">→ 箭头</button>
+      <button data-tool="darrow" title="双箭头">↔ 双箭头</button>
+    </div>
+    <div class="group" id="tools2">
+      <button data-tool="rect" title="矩形（Shift 正方形）">▭ 矩形</button>
+      <button data-tool="roundrect" title="圆角矩形">▢ 圆角矩形</button>
+      <button data-tool="circle" title="正圆">◯ 圆</button>
+      <button data-tool="ellipse" title="椭圆">⬭ 椭圆</button>
+      <button data-tool="semicircle" title="半圆">◗ 半圆</button>
+      <button data-tool="triangle" title="三角形">△ 三角</button>
+      <button data-tool="diamond" title="菱形">◇ 菱形</button>
+      <button data-tool="trapezoid" title="梯形">⏢ 梯形</button>
+      <button data-tool="parallelogram" title="平行四边形">▱ 平行四边形</button>
+      <button data-tool="pentagon" title="五边形">⬠ 五边形</button>
+      <button data-tool="hexagon" title="六边形">⬡ 六边形</button>
+      <button data-tool="star" title="五角星">★ 五角星</button>
+      <button data-tool="star6" title="六角星">✶ 六角星</button>
+      <button data-tool="cross" title="十字">✚ 十字</button>
+      <button data-tool="heart" title="心形">❤ 心形</button>
+      <button data-tool="crescent" title="月牙">☾ 月牙</button>
+      <button data-tool="cloud" title="云朵">☁ 云朵</button>
+    </div>
+    <div class="group">
+      <button id="btnRotL" title="逆时针旋转 15°（按住 Shift 为 5°）">↺ 逆时针</button>
+      <button id="btnRotR" title="顺时针旋转 15°（按住 Shift 为 5°）">↻ 顺时针</button>
+      <label class="chk">角度 <input type="range" id="rotAngle" min="-180" max="180" step="0.5" value="0" style="width:86px" title="拖动即旋转，松手归零"></label>
+      <button id="btnPivotSel" title="旋转中心 = 选区中心">⌖ 选区中心</button>
+      <button id="btnPivotCanvas" title="旋转中心 = 画布中心">⛶ 画布中心</button>
+    </div>
+    <div class="group">
+      <label class="chk">箭头 <input type="range" id="arrowSize" min="0.4" max="3" step="0.1" value="1" style="width:70px"></label>
+      <label class="chk">橡皮 <input type="range" id="eraserSize" min="6" max="44" step="2" value="16" style="width:70px"></label>
+      <label class="chk"><input type="checkbox" id="snapGrid"> 网格吸附</label>
+      <label class="chk"><input type="checkbox" id="showGrid"> 显示网格</label>
+    </div>
+    <div class="group">
+      <button id="btnUndo" title="Ctrl+Z">↶ 撤销</button>
+      <button id="btnRedo" title="Ctrl+Y">↷ 重做</button>
+      <button id="btnSelAll" title="Ctrl+A">▣ 全选</button>
+      <button id="btnDup" title="Ctrl+D">⧉ 复制</button>
+      <button id="btnMirrorH" title="复制并关于画布中线左右镜像">⇋ 镜像复制</button>
+      <button id="btnMirrorV" title="复制并关于画布中线上下镜像">⇵ 上下镜像</button>
+      <button id="btnDelSel" title="Delete">🗑 删除选中</button>
+      <button id="btnClearAll">清空全部</button>
+    </div>
+    <span id="drawInfo" class="info"></span>
+  </div>
+
+  <footer>
+    灵感来自 B 站「漫士」《半小时速通傅里叶变换：千年的圆上圆游戏》 ·
+    每条闭合线条独立做离散傅里叶变换，由各自的一组旋转圆绘制 ·
+    支持 GIF / WebM 视频导出
+  </footer>
+
+  <!-- 导出对话框 -->
+  <div id="exportOverlay" class="overlay">
+    <div class="card">
+      <h3>📤 导出设置</h3>
+      <div class="field">
+        <span>格式</span>
+        <label><input type="radio" name="fmt" value="gif" checked> GIF 动图</label>
+        <label><input type="radio" name="fmt" value="webm"> WebM 视频</label>
+      </div>
+      <div class="field">
+        <span>清晰度</span>
+        <select id="expRes"></select>
+      </div>
+      <div class="field">
+        <span>帧率</span>
+        <select id="expFps"></select>
+      </div>
+      <div class="note" id="expNote"></div>
+      <div class="row">
+        <button id="expCancel">取消</button>
+        <button id="expStart" class="accent">开始导出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 进度遮罩 -->
+  <div id="overlay" class="overlay">
+    <div class="card">
+      <div class="spinner"></div>
+      <div id="overlayText">正在生成 GIF…</div>
+      <div class="bar"><div id="progressBar"></div></div>
+      <button id="btnCancelRec">取消录制</button>
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+// ---------------- 基础元素 ----------------
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const hint = document.getElementById('hint');
+const speedLabel = document.getElementById('speedLabel');
+const shapeInfo = document.getElementById('shapeInfo');
+const circlesInput = document.getElementById('circles');
+const circlesNumInput = document.getElementById('circlesNum');
+const btnDraw = document.getElementById('btnDraw');
+const drawBar = document.getElementById('drawBar');
+const drawInfo = document.getElementById('drawInfo');
+const loadInput = document.getElementById('loadInput');
+const toastEl = document.getElementById('toast');
+const btnUpload = document.getElementById('btnUpload');
+const btnExport = document.getElementById('btnExport');
+const btnPlay = document.getElementById('btnPlay');
+const fileInput = document.getElementById('fileInput');
+const exportOverlay = document.getElementById('exportOverlay');
+const expRes = document.getElementById('expRes');
+const expFps = document.getElementById('expFps');
+const expNote = document.getElementById('expNote');
+const overlay = document.getElementById('overlay');
+const overlayText = document.getElementById('overlayText');
+const progressBar = document.getElementById('progressBar');
+const btnCancelRec = document.getElementById('btnCancelRec');
+
+let W = 0, H = 0, dpr = 1;
+
+// 主视图：封装 ctx、尺寸与 世界坐标->屏幕坐标 的映射
+const mainView = { ctx, W: 0, H: 0, cx: 0, cy: 0, scale: 1 };
+
+const SAMPLE_N = 2048;         // 每条线条的均匀采样点数（= 每条线的傅里叶项数上限，最大 2048 个圆）
+const LINE_SAMPLE_N = 1024;    // 线稿（中心线）模式每条线的采样点数（笔画简单，1024 项足够且快 4 倍）
+const LOOP_SPEED = 0.12;       // 实时动画速度 1× 时每秒完成的圈数
+const GIF_LOOP_SEC = 6;        // GIF / 视频一圈的时长（秒）
+const HOLD_SEC = 0.6;          // 视频结尾停顿（秒）
+const MAX_TOTAL_CIRCLES = 20000; // 所有线条圆数总上限（性能保护；按复杂度分配）
+let maxContours = 120;         // 上传识别时保留的线条数上限（可调：越多样条越精细）
+const EXTRACT_MAX = 1000;      // 上传图片处理时的最长边像素（越大越能留住细线条）
+const LABEL_BUDGET = 60;       // 每帧最多绘制多少个频率标注
+
+// ---------------- 状态 ----------------
+// 每条线：{ coeffs, active, trail, hue }
+let shapes = [];
+let t = 0;
+let playing = true;
+let speed = 1;
+let numCircles = 40;           // 每条线的圆数
+let showCircles = true;
+let showLabels = true;
+let showTrace = true;
+
+let drawing = false;
+let recogMode = 'auto';        // 上传图片的线条识别方式：auto / contour / line
+
+// ---------------- 绘图（组合）状态 ----------------
+// 每个图形：{ paths: [[{x,y}, ...], ...], closed: bool }（坐标为主画布 CSS 像素）
+let drawShapes = [];
+let selectedShapes = [];       // 当前选中的图形（数组，支持多选）
+let currentTool = 'free';      // select / free / line / arrow / ... / eraser
+let dragState = null;          // { mode:'create'|'move'|'free'|'erase', ... }
+let freehand = [];             // 自由画笔正在画的轨迹
+let eraserPos = null;          // 橡皮擦光标位置
+let eraserSize = 16;           // 橡皮擦半径（px）
+let arrowSize = 1;             // 箭头末端大小倍率（0.4–3）
+let snapGrid = false;          // 是否吸附网格（默认关闭，拖动更跟手）
+let showGrid = false;          // 是否显示网格
+let canvasAspect = 'auto';     // 画幅比例：auto / 1:1 / 4:3 / 3:4 / 16:9 / 9:16 / 2:1
+let wideWidth = 1100;          // 画幅最大宽度（px）
+let focusMode = false;         // 专注模式：隐藏页头页脚，画布最大化
+let pivot = null;              // 自定义旋转中心（null = 选区中心）
+let rotBaseline = null;        // 角度滑块旋转时的基准快照
+let viewZoom = 1;              // 视图缩放（1 = 适应画布）
+let viewPanX = 0, viewPanY = 0;// 视图平移（CSS px）
+let spaceDown = false;         // 是否按住空格（平移修饰键）
+let panState = null;           // 平移拖动状态
+let history = [], historyIdx = -1;
+let currentPaths = [];         // 当前图形的原始路径（供「保存作品」）
+let showPreview = false;       // 动画视图里是否显示「即将绘制的线条」
+let previewCache = [];         // 线条预览的缓存（按图形与圆数变化重算）
+const GRID = 20;               // 网格间距（px）
+
+let videoMode = null;
+let vid = null;
+
+// ---------------- 预设图形（返回粗略闭合折线数组，稍后统一重采样） ----------------
+function polygon(n, R = 1, rot = -Math.PI / 2) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = rot + 2 * Math.PI * i / n;
+    pts.push({ x: Math.cos(a) * R, y: Math.sin(a) * R });
+  }
+  return pts;
+}
+function starPolygon(n, R = 1, r = 0.5, rot = -Math.PI / 2) {
+  const pts = [];
+  for (let i = 0; i < 2 * n; i++) {
+    const a = rot + Math.PI * i / n;
+    const rad = (i % 2 === 0) ? R : r;
+    pts.push({ x: Math.cos(a) * rad, y: Math.sin(a) * rad });
+  }
+  return pts;
+}
+function parametric(N, fx, fy) {
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const th = 2 * Math.PI * i / N;
+    pts.push({ x: fx(th), y: fy(th) });
+  }
+  return pts;
+}
+function circlePath(cx0, cy0, r, N = 160) {
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const a = 2 * Math.PI * i / N;
+    pts.push({ x: cx0 + r * Math.cos(a), y: cy0 + r * Math.sin(a) });
+  }
+  return pts;
+}
+// 预设都以「多条线条」的形式给出（多数只有一条）
+const PRESETS = {
+  heart: () => [parametric(2048,
+    th => 16 * Math.pow(Math.sin(th), 3),
+    th => 13 * Math.cos(th) - 5 * Math.cos(2 * th) - 2 * Math.cos(3 * th) - Math.cos(4 * th))],
+  star: () => [starPolygon(5, 1, 0.5)],
+  cardioid: () => [parametric(2048,
+    th => { const r = 1 + Math.cos(th); return r * Math.cos(th); },
+    th => { const r = 1 + Math.cos(th); return r * Math.sin(th); })],
+  rose5: () => [parametric(2048,
+    th => { const r = Math.cos(5 * th); return r * Math.cos(th); },
+    th => { const r = Math.cos(5 * th); return r * Math.sin(th); })],
+  rose8: () => [parametric(2048,
+    th => { const r = Math.cos(4 * th); return r * Math.cos(th); },
+    th => { const r = Math.cos(4 * th); return r * Math.sin(th); })],
+  deltoid: () => [parametric(2048,
+    th => 2 * Math.cos(th) + Math.cos(2 * th),
+    th => 2 * Math.sin(th) - Math.sin(2 * th))],
+  astroid: () => [parametric(2048,
+    th => 3 * Math.cos(th) + Math.cos(3 * th),
+    th => 3 * Math.sin(th) - Math.sin(3 * th))],
+  epicycloid: () => [parametric(2048,
+    th => 4 * Math.cos(th) - Math.cos(4 * th),
+    th => 4 * Math.sin(th) - Math.sin(4 * th))],
+  spiral: () => {
+    const pts = [], N = 1200, turns = 2.5;
+    const add = (s) => {
+      const th = 2 * Math.PI * turns * s;
+      const r = 0.05 + 0.95 * s;
+      pts.push({ x: Math.cos(th) * r, y: Math.sin(th) * r });
+    };
+    for (let i = 0; i < N; i++) add(i / (N - 1));
+    for (let i = N - 1; i >= 0; i--) add(i / (N - 1));
+    return [pts];
+  },
+  lissajous: () => [parametric(2048, th => Math.sin(3 * th), th => Math.cos(5 * th))],
+  infinity: () => [parametric(2048,
+    th => Math.cos(th) / (1 + Math.sin(th) * Math.sin(th)),
+    th => Math.sin(th) * Math.cos(th) / (1 + Math.sin(th) * Math.sin(th)))],
+  square: () => [polygon(4, 1)],
+  triangle: () => [polygon(3, 1)],
+  pentagon: () => [polygon(5, 1)],
+  // 演示「多条独立线条」：脸 + 两只眼 + 嘴
+  smiley: () => {
+    const face = circlePath(0, 0, 1, 220);
+    const leftEye = circlePath(-0.36, -0.28, 0.13, 90);
+    const rightEye = circlePath(0.36, -0.28, 0.13, 90);
+    const mouth = [];
+    for (let i = 0; i <= 60; i++) {           // 笑脸嘴：一段圆弧，闭合后成为月牙
+      const a = Math.PI * 0.18 + (Math.PI * 0.64) * (i / 60);
+      mouth.push({ x: 0.62 * Math.cos(a), y: 0.30 + 0.42 * Math.sin(a) });
+    }
+    return [face, leftEye, rightEye, mouth];
+  }
+};
+
+// ---------------- 几何处理 ----------------
+function pathLength(pts) {
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  return L;
+}
+function resampleClosed(points, N) {
+  const pts = points.concat([points[0]]);
+  const segLens = [];
+  let total = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const d = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y);
+    segLens.push(d); total += d;
+  }
+  if (total === 0) return null;
+  const out = [];
+  for (let j = 0; j < N; j++) {
+    const target = total * j / N;
+    let acc = 0;
+    for (let i = 0; i < segLens.length; i++) {
+      if (acc + segLens[i] >= target || i === segLens.length - 1) {
+        const f = (target - acc) / (segLens[i] || 1);
+        out.push({
+          x: pts[i].x + (pts[i + 1].x - pts[i].x) * f,
+          y: pts[i].y + (pts[i + 1].y - pts[i].y) * f
+        });
+        break;
+      }
+      acc += segLens[i];
+    }
+  }
+  return out;
+}
+
+// ---------------- 傅里叶变换 ----------------
+// z_k = x_k + i·y_k，c_n = (1/N) Σ z_k·e^{-2πi nk/N}
+function computeDFT(points) {
+  const N = points.length;
+  const lo = -Math.floor(N / 2);
+  const hi = Math.floor((N - 1) / 2);
+  const coeffs = [];
+  for (let n = lo; n <= hi; n++) {
+    let re = 0, im = 0;
+    for (let k = 0; k < N; k++) {
+      const th = 2 * Math.PI * n * k / N;
+      const c = Math.cos(th), s = Math.sin(th);
+      const x = points[k].x, y = points[k].y;
+      re += x * c + y * s;
+      im += y * c - x * s;
+    }
+    re /= N; im /= N;
+    coeffs.push({ n, re, im, amp: Math.hypot(re, im), phase: Math.atan2(im, re) });
+  }
+  coeffs.sort((a, b) => b.amp - a.amp);
+  return coeffs;
+}
+
+// 载入多条闭合线条：重采样 -> 共同归一化 -> 每条各自做 DFT
+// 关键：所有线条共用同一中心与缩放，否则相对位置与大小会被破坏；
+// 各条的直流项(n=0)会自然充当平移圆，把该组圆移到正确位置。
+function setShapes(rawPaths, sampleN = SAMPLE_N) {
+  const items = [];
+  let cost = 0;
+  for (const raw of rawPaths) {
+    const pts = Array.isArray(raw) ? raw : (raw && raw.pts);
+    if (!pts || pts.length < 3) continue;
+    // 采样点数按弧长自适应：细节不可能超过像素数，
+    // 短笔画少采样能大幅降低 DFT 开销，从而支撑上百条线条
+    const cap = Array.isArray(raw) ? sampleN : (raw.sampleN || sampleN);
+    const factor = Array.isArray(raw) ? 1.0 : 0.7;
+    const n = Math.max(48, Math.min(cap, Math.round(pathLength(pts) * factor)));
+    items.push({ pts, n });
+    cost += n * n;                                   // DFT 是 O(N²)
+  }
+  // 总开销保护：线条极多且很长时整体降采样，避免载入要等好几秒
+  const COST_LIMIT = 30e6;
+  if (cost > COST_LIMIT) {
+    const k = Math.sqrt(COST_LIMIT / cost);
+    for (const it of items) it.n = Math.max(32, Math.round(it.n * k));
+  }
+  const resampled = [];
+  const kept = [];
+  for (const it of items) {
+    const u = resampleClosed(it.pts, it.n);
+    if (u) { resampled.push(u); kept.push(it.pts); }
+  }
+  currentPaths = kept.map(pa => pa.map(q => ({ x: q.x, y: q.y })));
+  if (!resampled.length) return;
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const pts of resampled) {
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    }
+  }
+  const ccx = (minX + maxX) / 2, ccy = (minY + maxY) / 2;
+  const s = Math.max(maxX - minX, maxY - minY) || 1;
+
+  shapes = resampled.map((pts, i) => ({
+    coeffs: computeDFT(pts.map(p => ({ x: (p.x - ccx) / s * 2, y: (p.y - ccy) / s * 2 }))),
+    active: [],
+    trail: [],
+    hue: (190 + i * 57) % 360
+  }));
+  applyCircleCount();
+  t = 0; playing = true;
+  updatePlayBtn();
+}
+
+function clearTrails() { for (const s of shapes) s.trail = []; }
+
+// 估计「要还原到 98.5% 能量」需要多少个系数 —— 作为圆数分配的依据
+// 注意：只统计交流分量（n≠0）。直流项只是把整组圆平移到正确位置，
+// 它的能量往往占 99%+，若计入会让所有图形都被误判成「很少圆就够」。
+function neededCount(coeffs, frac = 0.985) {
+  let total = 0, dc = 0;
+  for (let i = 0; i < coeffs.length; i++) {
+    const e = coeffs[i].amp * coeffs[i].amp;
+    total += e;
+    if (coeffs[i].n === 0) dc = e;
+  }
+  const ac = total - dc;
+  if (!(ac > 0)) return 4;
+  let acc = 0, k = 0;
+  for (let i = 0; i < coeffs.length; i++) {
+    if (coeffs[i].n === 0) continue;
+    acc += coeffs[i].amp * coeffs[i].amp;
+    k++;
+    if (acc >= ac * frac) return Math.max(4, k + 1);      // +1 留给直流平移项
+  }
+  return coeffs.length;
+}
+
+// 圆数按「复杂度」分配：简单笔画少给、复杂轮廓多给，而不是平均分配
+// （平均分配会让发丝和五官都画不好）；并把预算尽量用满
+function applyCircleCount() {
+  if (!shapes.length) { updateShapeInfo(); rebuildPreview(); return; }
+  const budget = Math.max(shapes.length * 4, Math.min(MAX_TOTAL_CIRCLES, numCircles * shapes.length));
+  const cap = shapes.map(s => s.coeffs.length);
+  const alloc = shapes.map(() => 4);
+  let remaining = budget - shapes.length * 4;
+  let open = shapes.map((_, i) => i);
+  for (let pass = 0; pass < 6 && remaining > 0 && open.length; pass++) {
+    let wsum = 0;
+    for (const i of open) {
+      if (shapes[i].need === undefined) shapes[i].need = neededCount(shapes[i].coeffs);
+      wsum += shapes[i].need;
+    }
+    if (wsum <= 0) break;
+    let used = 0;
+    for (const i of open) {
+      const add = Math.min(Math.floor(remaining * shapes[i].need / wsum), cap[i] - alloc[i]);
+      if (add > 0) { alloc[i] += add; used += add; }
+    }
+    remaining -= used;
+    if (!used) break;
+    open = open.filter(i => alloc[i] < cap[i]);          // 已满的不再参与
+  }
+  let total = 0;
+  shapes.forEach((s, i) => {
+    s.active = s.coeffs.slice(0, Math.min(alloc[i], cap[i]));
+    total += s.active.length;
+  });
+  updateShapeInfo(total);
+  rebuildPreview();
+}
+
+function updateShapeInfo(totalIn) {
+  if (!shapes.length) { shapeInfo.textContent = ''; return; }
+  const total = totalIn !== undefined ? totalIn : shapes.reduce((a, s) => a + s.active.length, 0);
+  const many = shapes.length > 1 ? '（按复杂度分配）' : '';
+  shapeInfo.textContent = `${shapes.length} 条线 · 共 ${total} 个圆${many}`;
+}
+
+// ---------------- 动画计算 ----------------
+// 叠加一组系数对应的旋转矢量：返回各圆圆心/半径/角度与笔尖
+function computeArms(active, t) {
+  const arms = [];
+  let px = 0, py = 0;
+  for (const c of active) {
+    const angle = c.phase + 2 * Math.PI * c.n * t;
+    arms.push({ x: px, y: py, r: c.amp, angle, n: c.n });
+    px += c.amp * Math.cos(angle);
+    py += c.amp * Math.sin(angle);
+  }
+  return { arms, tip: { x: px, y: py } };
+}
+
+// 预计算某组圆一整圈的笔尖路径（供导出按相位截取轨迹）
+function computeFullPath(active, F) {
+  const path = [];
+  for (let i = 0; i <= F; i++) path.push(computeArms(active, i / F).tip);
+  return path;
+}
+
+// ---------------- 渲染 ----------------
+function toScreen(view, p) { return { x: p.x * view.scale + view.cx, y: p.y * view.scale + view.cy }; }
+
+function drawTrace(view, pts, hue) {
+  if (pts.length < 2) return;
+  const g = view.ctx;
+  g.save();
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  g.strokeStyle = `hsla(${hue}, 95%, 62%, 0.92)`;
+  g.shadowColor = `hsla(${hue}, 95%, 62%, 0.85)`;
+  g.lineWidth = 2;
+  g.shadowBlur = 7;
+  g.beginPath();
+  const s0 = toScreen(view, pts[0]);
+  g.moveTo(s0.x, s0.y);
+  for (let i = 1; i < pts.length; i++) {
+    const s = toScreen(view, pts[i]);
+    g.lineTo(s.x, s.y);
+  }
+  g.stroke();
+  g.restore();
+}
+
+function drawArms(view, arms, hueBase, labelBudget) {
+  const g = view.ctx;
+  g.save();
+  g.lineWidth = 1;
+  for (let i = 0; i < arms.length; i++) {
+    const a = arms[i];
+    const r = a.r * view.scale;
+    if (r < 0.5) continue;              // 半径不足半像素、根本看不见的圆跳过（圆数量大时的性能关键）
+    const c = toScreen(view, { x: a.x, y: a.y });
+    const hue = (hueBase + i * 3) % 360;
+
+    g.beginPath();
+    g.arc(c.x, c.y, r, 0, 2 * Math.PI);
+    g.strokeStyle = `hsla(${hue}, 85%, 68%, 0.30)`;
+    g.stroke();
+
+    const tip = toScreen(view, { x: a.x + a.r * Math.cos(a.angle), y: a.y + a.r * Math.sin(a.angle) });
+    g.beginPath();
+    g.moveTo(c.x, c.y);
+    g.lineTo(tip.x, tip.y);
+    g.strokeStyle = `hsla(${hue}, 85%, 62%, 0.72)`;
+    g.stroke();
+
+    if (r >= 3) {                       // 小圆不必画圆心点
+      g.beginPath();
+      g.arc(c.x, c.y, 1.4, 0, 2 * Math.PI);
+      g.fillStyle = `hsla(${hue}, 85%, 72%, 0.9)`;
+      g.fill();
+    }
+
+    if (showLabels && labelBudget && labelBudget.n > 0 && r >= 7 && i < 48) {
+      labelBudget.n--;
+      g.font = '9px ui-monospace, Consolas, monospace';
+      g.textAlign = 'left';
+      g.textBaseline = 'bottom';
+      g.fillStyle = `hsla(${hue}, 85%, 78%, 0.9)`;
+      g.fillText(`n:${a.n}  r:${a.r.toFixed(2)}`, c.x + 5, c.y - 4);
+    }
+  }
+  g.restore();
+}
+
+function drawTip(view, tip, hue) {
+  const g = view.ctx;
+  const s = toScreen(view, tip);
+  g.save();
+  g.fillStyle = '#ffffff';
+  g.shadowColor = `hsla(${hue}, 95%, 70%, 1)`;
+  g.shadowBlur = 12;
+  g.beginPath();
+  g.arc(s.x, s.y, 3, 0, 2 * Math.PI);
+  g.fill();
+  g.restore();
+}
+
+function drawOrigin(view) {
+  const g = view.ctx;
+  g.fillStyle = 'rgba(255,255,255,0.5)';
+  g.beginPath();
+  g.arc(view.cx, view.cy, 2, 0, 2 * Math.PI);
+  g.fill();
+}
+
+// 线条预览：把当前圆数下「即将由圆画出的路径」淡淡地铺在底层
+function rebuildPreview() {
+  previewCache = shapes.length ? shapes.map(s => computeFullPath(s.active, 300)) : [];
+}
+function drawPreviewPath(view, pts, hue) {
+  if (!pts || pts.length < 2) return;
+  const g = view.ctx;
+  g.save();
+  g.strokeStyle = `hsla(${hue}, 85%, 66%, 0.30)`;
+  g.lineWidth = 1.2;
+  g.beginPath();
+  const s0 = toScreen(view, pts[0]);
+  g.moveTo(s0.x, s0.y);
+  for (let i = 1; i < pts.length; i++) {
+    const s = toScreen(view, pts[i]);
+    g.lineTo(s.x, s.y);
+  }
+  g.stroke();
+  g.restore();
+}
+function drawPreviews(view) {
+  for (let i = 0; i < previewCache.length && i < shapes.length; i++) {
+    drawPreviewPath(view, previewCache[i], shapes[i].hue);
+  }
+}
+
+function strokePath(g, path, closed) {
+  if (!path || path.length < 2) return;
+  g.beginPath();
+  g.moveTo(path[0].x, path[0].y);
+  for (let i = 1; i < path.length; i++) g.lineTo(path[i].x, path[i].y);
+  if (closed) g.closePath();
+  g.stroke();
+}
+
+// 绘图模式的画面：网格 + 已放置图形 + 正在绘制/拖动的预览
+function drawDrawMode(view) {
+  const g = view.ctx;
+  if (showGrid) {
+    g.save();
+    g.strokeStyle = 'rgba(90,125,180,0.22)';
+    g.lineWidth = 1;
+    g.beginPath();
+    for (let x = 0; x <= view.W; x += GRID) { g.moveTo(x, 0); g.lineTo(x, view.H); }
+    for (let y = 0; y <= view.H; y += GRID) { g.moveTo(0, y); g.lineTo(view.W, y); }
+    g.stroke();
+    g.restore();
+  }
+  g.save();
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  for (const s of drawShapes) {
+    const sel = (selectedShapes.indexOf(s) >= 0);
+    g.strokeStyle = sel ? '#ffd166' : 'rgba(150,175,215,0.85)';
+    g.lineWidth = sel ? 2.5 : 2;
+    g.shadowColor = sel ? 'rgba(255,209,102,0.8)' : 'transparent';
+    g.shadowBlur = sel ? 6 : 0;
+    for (const path of s.paths) strokePath(g, path, s.closed);
+  }
+  g.restore();
+
+  // 选中图形：描边高亮 + 缩放框与四角手柄
+  if (selectedShapes.length) {
+    const bb = selectionBBox();
+    if (bb) {
+      g.save();
+      g.setLineDash([6, 5]);
+      g.strokeStyle = 'rgba(255,209,102,0.75)';
+      g.lineWidth = 1.2;
+      g.strokeRect(bb.x0 - 6, bb.y0 - 6, bb.x1 - bb.x0 + 12, bb.y1 - bb.y0 + 12);
+      g.setLineDash([]);
+      g.fillStyle = '#ffd166';
+      g.strokeStyle = 'rgba(40,30,10,0.9)';
+      g.lineWidth = 1;
+      for (const [hx, hy] of [[bb.x0, bb.y0], [bb.x1, bb.y0], [bb.x0, bb.y1], [bb.x1, bb.y1]]) {
+        g.beginPath();
+        g.rect(hx - 5, hy - 5, 10, 10);
+        g.fill();
+        g.stroke();
+      }
+      g.restore();
+
+      // 旋转手柄（四角外侧圆点）与旋转中心准星
+      const hs = rotationHandles();
+      const corners = [[bb.x0, bb.y0], [bb.x1, bb.y0], [bb.x0, bb.y1], [bb.x1, bb.y1]];
+      g.save();
+      g.strokeStyle = 'rgba(124,77,255,0.38)';
+      g.setLineDash([3, 3]);
+      g.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        g.beginPath();
+        g.moveTo(corners[i][0], corners[i][1]);
+        g.lineTo(hs[i][0], hs[i][1]);
+        g.stroke();
+      }
+      g.setLineDash([]);
+      g.fillStyle = 'rgba(124,77,255,0.5)';
+      g.strokeStyle = 'rgba(195,170,255,0.95)';
+      g.lineWidth = 1.4;
+      for (const [hx, hy] of hs) {
+        g.beginPath();
+        g.arc(hx, hy, 5.5, 0, Math.PI * 2);
+        g.fill();
+        g.stroke();
+      }
+      const pv = currentPivot();
+      g.strokeStyle = '#ff8a5c';
+      g.lineWidth = 1.6;
+      g.beginPath();
+      g.arc(pv.x, pv.y, 8, 0, Math.PI * 2);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(pv.x - 13, pv.y); g.lineTo(pv.x + 13, pv.y);
+      g.moveTo(pv.x, pv.y - 13); g.lineTo(pv.x, pv.y + 13);
+      g.stroke();
+      g.restore();
+
+      if (dragState && (dragState.mode === 'scale' || dragState.mode === 'rotate')) {
+        const label = dragState.mode === 'rotate'
+          ? `旋转 ${(dragState.ang * 180 / Math.PI).toFixed(1)}°`
+          : `${Math.round((bb.x1 - bb.x0))} × ${Math.round((bb.y1 - bb.y0))} · ${Math.round(dragState.sx * 100)}%`;
+        g.save();
+        g.font = '12px ui-monospace, Consolas, monospace';
+        g.fillStyle = 'rgba(255,255,255,0.92)';
+        g.textAlign = 'left'; g.textBaseline = 'top';
+        g.fillText(label, bb.x1 + 40, bb.y1 + 10);
+        g.restore();
+      }
+    }
+  }
+
+  // 橡皮擦光标
+  if (currentTool === 'eraser' && eraserPos) {
+    g.save();
+    g.beginPath();
+    g.arc(eraserPos.x, eraserPos.y, eraserSize, 0, 2 * Math.PI);
+    g.strokeStyle = 'rgba(255,120,150,0.9)';
+    g.lineWidth = 1.5;
+    g.stroke();
+    g.fillStyle = 'rgba(255,120,150,0.12)';
+    g.fill();
+    g.restore();
+  }
+
+  // 正在创建的图形预览
+  if (dragState && dragState.mode === 'create') {
+    const built = buildShape(currentTool, dragState.a, dragState.b, dragState.shift, dragState.alt);
+    if (built) {
+      g.save();
+      g.strokeStyle = 'rgba(255,255,255,0.95)';
+      g.lineWidth = 2.5;
+      g.lineJoin = 'round'; g.lineCap = 'round';
+      g.shadowColor = 'rgba(255,255,255,0.5)'; g.shadowBlur = 4;
+      for (const path of built.paths) strokePath(g, path, built.closed);
+      g.restore();
+      const dx = dragState.b.x - dragState.a.x, dy = dragState.b.y - dragState.a.y;
+      const isLine = (currentTool === 'line' || currentTool === 'arrow' || currentTool === 'darrow');
+      const label = isLine
+        ? `长 ${Math.round(Math.hypot(dx, dy))} · ${Math.round(-Math.atan2(dy, dx) * 180 / Math.PI)}°`
+        : `${Math.round(Math.abs(dx))} × ${Math.round(Math.abs(dy))}`;
+      g.save();
+      g.font = '12px ui-monospace, Consolas, monospace';
+      g.fillStyle = 'rgba(255,255,255,0.92)';
+      g.textAlign = 'left'; g.textBaseline = 'top';
+      g.fillText(label, dragState.b.x + 12, dragState.b.y + 12);
+      g.restore();
+    }
+  }
+  // 自由画笔正在画的轨迹
+  if (freehand.length >= 2) {
+    g.save();
+    g.strokeStyle = 'rgba(255,255,255,0.95)';
+    g.lineWidth = 2.5;
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.shadowColor = 'rgba(255,255,255,0.5)'; g.shadowBlur = 4;
+    strokePath(g, freehand, false);
+    g.restore();
+  }
+}
+
+// 把多条线在相位 tt 的一帧画到任意 view 上（traces 为空时用实时轨迹）
+function paintShapes(view, tt, traces) {
+  const labelBudget = { n: LABEL_BUDGET };
+  if (showPreview) drawPreviews(view);
+  for (let i = 0; i < shapes.length; i++) {
+    const s = shapes[i];
+    drawTrace(view, traces ? traces[i] : s.trail, s.hue);
+    const { arms, tip } = computeArms(s.active, tt);
+    if (showCircles) drawArms(view, arms, s.hue, labelBudget);
+    drawTip(view, tip, s.hue);
+  }
+  drawOrigin(view);
+}
+
+// ---------------- 主循环 ----------------
+let last = performance.now();
+let frameCount = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  const g = mainView.ctx;
+
+  if (videoMode) {
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);        // 导出不受视图缩放影响
+    const el = (now - videoMode.startTime) / 1000;
+    const tt = Math.min(el / GIF_LOOP_SEC, 1);
+    const idx = Math.round(tt * videoMode.F);
+    g.fillStyle = '#0d1322';
+    g.fillRect(0, 0, mainView.W, mainView.H);
+    paintShapes(mainView, tt, videoMode.fullPaths.map(fp => fp.slice(0, idx + 1)));
+    if (el > GIF_LOOP_SEC + HOLD_SEC && vid) vid.rec.stop();
+    return;
+  }
+
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  applyViewTransform(g);                          // 之后所有绘制都在「基准坐标」下进行
+
+  if (drawing) { drawDrawMode(mainView); return; }
+  if (!shapes.length) return;
+
+  if (playing) {
+    t += dt * speed * LOOP_SPEED;
+    if (t >= 1) { t -= 1; clearTrails(); }
+  }
+
+  const labelBudget = { n: LABEL_BUDGET };
+  if (showPreview) drawPreviews(mainView);
+  // 线条很多时轨迹隔帧取样，把每帧折线点数控制在可流畅绘制的范围
+  const trailStep = shapes.length > 60 ? 2 : 1;
+  frameCount++;
+  const pushTrail = (frameCount % trailStep) === 0;
+  for (const s of shapes) {
+    const { arms, tip } = computeArms(s.active, t);
+    if (playing && pushTrail) s.trail.push(tip);
+    if (showTrace) drawTrace(mainView, s.trail, s.hue);
+    if (showCircles) drawArms(mainView, arms, s.hue, labelBudget);
+    drawTip(mainView, tip, s.hue);
+  }
+  drawOrigin(mainView);
+}
+
+// ---------------- 尺寸自适应 ----------------
+function resize() {
+  if (videoMode) return;                        // 录制期间尺寸由导出逻辑接管
+  const stage = canvas.parentElement;
+  const controls = document.querySelector('.controls');
+  dpr = window.devicePixelRatio || 1;
+
+  // 画幅宽度：多档，0 表示跟随窗口；且不超过窗口可用宽度
+  const box = focusMode ? 28 : 44;
+  const maxW = Math.max(360, Math.min(wideWidth > 0 ? wideWidth : 1e5, window.innerWidth - box));
+  controls.style.maxWidth = maxW + 'px';
+  drawBar.style.maxWidth = maxW + 'px';
+  stage.style.maxWidth = maxW + 'px';
+  const rect = stage.getBoundingClientRect();
+  let cw = Math.max(320, rect.width);
+
+  // 可用高度 = 视口高度 - 工具栏 / 页头页脚占位
+  let chrome = controls.offsetHeight + 64;
+  if (drawing && drawBar.classList.contains('show')) chrome += drawBar.offsetHeight + 10;
+  if (!focusMode) {
+    const hd = document.querySelector('header'), ft = document.querySelector('footer');
+    chrome += (hd ? hd.offsetHeight : 0) + (ft ? ft.offsetHeight : 0) + 34;
+  }
+  const availH = Math.max(300, window.innerHeight - chrome);
+
+  let ch;
+  if (canvasAspect === 'auto') {
+    ch = Math.max(320, Math.min(availH, cw * 0.62));
+  } else {
+    const [aw, ah] = canvasAspect.split(':').map(Number);
+    ch = cw * ah / aw;
+    if (ch > availH) { ch = availH; cw = ch * aw / ah; }   // 高度受限 → 反过来收窄宽度
+    if (ch < 240) { ch = 240; cw = ch * aw / ah; }
+  }
+  W = Math.round(cw);
+  H = Math.round(ch);
+  stage.style.height = H + 'px';
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  Object.assign(mainView, { W, H, cx: W / 2, cy: H / 2, scale: Math.min(W, H) * 0.30 });
+}
+
+document.getElementById('aspectSel').addEventListener('change', (e) => {
+  canvasAspect = e.target.value;
+  resize();
+});
+document.getElementById('widthSel').addEventListener('change', (e) => {
+  wideWidth = parseInt(e.target.value, 10);
+  resize();
+});
+
+// ---------------- 视图缩放 / 平移 ----------------
+// 所有绘制仍用「基准坐标」（= 适应画布的 CSS 像素），由画布变换实现缩放平移
+function applyViewTransform(g) {
+  const z = viewZoom;
+  g.setTransform(dpr * z, 0, 0, dpr * z,
+    dpr * (mainView.cx + viewPanX - z * mainView.cx),
+    dpr * (mainView.cy + viewPanY - z * mainView.cy));
+}
+function screenToBase(p) {                      // 屏幕坐标 → 基准坐标（供指针输入）
+  return {
+    x: (p.x - mainView.cx - viewPanX) / viewZoom + mainView.cx,
+    y: (p.y - mainView.cy - viewPanY) / viewZoom + mainView.cy
+  };
+}
+function updateZoomLabel() {
+  const el = document.getElementById('zoomInfo');
+  if (el) el.textContent = Math.round(viewZoom * 100) + '%';
+}
+function zoomAt(screenPt, factor) {             // 以某点为锚缩放（保持该点不动）
+  const before = screenToBase(screenPt);
+  viewZoom = Math.max(0.2, Math.min(10, viewZoom * factor));
+  const after = screenToBase(screenPt);
+  viewPanX += (after.x - before.x) * viewZoom;
+  viewPanY += (after.y - before.y) * viewZoom;
+  updateZoomLabel();
+}
+function resetView() {
+  viewZoom = 1; viewPanX = 0; viewPanY = 0;
+  updateZoomLabel();
+}
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (videoMode) return;
+  zoomAt({ x: e.offsetX, y: e.offsetY }, Math.exp(-e.deltaY * 0.0016));
+}, { passive: false });
+canvas.addEventListener('dblclick', () => { if (!drawing) resetView(); });
+document.getElementById('btnZoomIn').addEventListener('click', () =>
+  zoomAt({ x: mainView.cx + viewPanX, y: mainView.cy + viewPanY }, 1.25));
+document.getElementById('btnZoomOut').addEventListener('click', () =>
+  zoomAt({ x: mainView.cx + viewPanX, y: mainView.cy + viewPanY }, 0.8));
+document.getElementById('btnZoomFit').addEventListener('click', resetView);
+document.getElementById('btnFocus').addEventListener('click', () => {
+  focusMode = !focusMode;
+  document.body.classList.toggle('focus', focusMode);
+  document.getElementById('btnFocus').textContent = focusMode ? '⛶ 退出专注' : '⛶ 专注';
+  resize();
+  showToast(focusMode ? '专注模式：画布已最大化，按 Esc 退出' : '已退出专注模式', 2400);
+});
+
+// ---------------- 交互 ----------------
+function updatePlayBtn() { btnPlay.textContent = playing ? '⏸ 暂停' : '▶ 播放'; }
+
+// ============================================================
+//  绘图（组合）模式：基础几何图形 + 选择/移动/镜像/撤销
+// ============================================================
+function snapPt(p) {
+  if (!snapGrid) return { x: p.x, y: p.y };
+  return { x: Math.round(p.x / GRID) * GRID, y: Math.round(p.y / GRID) * GRID };
+}
+function sampleLine(a, b, n = 32) {
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+  }
+  return out;
+}
+function ellipsePath(cx, cy, rx, ry, n = 96) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / n * Math.PI * 2;
+    out.push({ x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
+  }
+  return out;
+}
+function polygonPath(cx, cy, rx, ry, n, rot = -Math.PI / 2) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = rot + i / n * Math.PI * 2;
+    out.push({ x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
+  }
+  return out;
+}
+function starPath(cx, cy, rx, ry, points = 5, inner = 0.42, rot = -Math.PI / 2) {
+  const out = [];
+  for (let i = 0; i < points * 2; i++) {
+    const t = rot + i * Math.PI / points;
+    const k = (i % 2 === 0) ? 1 : inner;
+    out.push({ x: cx + rx * k * Math.cos(t), y: cy + ry * k * Math.sin(t) });
+  }
+  return out;
+}
+function heartPath(cx, cy, rx, ry, n = 140) {
+  const raw = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / n * Math.PI * 2;
+    raw.push({                                   // 屏幕坐标 y 向下，故取负
+      x: 16 * Math.pow(Math.sin(t), 3),
+      y: -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+    });
+  }
+  let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+  for (const p of raw) {
+    mnx = Math.min(mnx, p.x); mxx = Math.max(mxx, p.x);
+    mny = Math.min(mny, p.y); mxy = Math.max(mxy, p.y);
+  }
+  const ox = (mxx + mnx) / 2, oy = (mxy + mny) / 2;
+  const sx = (mxx - mnx) / 2 || 1, sy = (mxy - mny) / 2 || 1;
+  return raw.map(p => ({ x: cx + (p.x - ox) / sx * rx, y: cy + (p.y - oy) / sy * ry }));
+}
+function constrain45(a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const step = Math.PI / 4;
+  const ang = Math.round(Math.atan2(dy, dx) / step) * step;
+  const len = Math.hypot(dx, dy);
+  return { x: a.x + len * Math.cos(ang), y: a.y + len * Math.sin(ang) };
+}
+function openToClosed(path) {                    // 开放笔画 → 去程 + 回程，构成闭合曲线
+  const out = path.slice();
+  for (let i = path.length - 2; i > 0; i--) out.push(path[i]);
+  return out;
+}
+
+function roundRectPath(x0, y0, x1, y1, r, n = 8) {
+  r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+  const out = [];
+  const corners = [
+    [x1 - r, y0 + r, -Math.PI / 2, 0],
+    [x1 - r, y1 - r, 0, Math.PI / 2],
+    [x0 + r, y1 - r, Math.PI / 2, Math.PI],
+    [x0 + r, y0 + r, Math.PI, Math.PI * 1.5]
+  ];
+  for (const [ccx, ccy, a0, a1] of corners) {
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (a1 - a0) * i / n;
+      out.push({ x: ccx + r * Math.cos(a), y: ccy + r * Math.sin(a) });
+    }
+  }
+  return out;
+}
+function crossPath(x0, y0, x1, y1, arm = 0.34) {
+  const w = x1 - x0, h = y1 - y0;
+  const ax = w * arm / 2, ay = h * arm / 2;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  return [
+    { x: cx - ax, y: y0 }, { x: cx + ax, y: y0 },
+    { x: cx + ax, y: cy - ay }, { x: x1, y: cy - ay },
+    { x: x1, y: cy + ay }, { x: cx + ax, y: cy + ay },
+    { x: cx + ax, y: y1 }, { x: cx - ax, y: y1 },
+    { x: cx - ax, y: cy + ay }, { x: x0, y: cy + ay },
+    { x: x0, y: cy - ay }, { x: cx - ax, y: cy - ay }
+  ];
+}
+// 月牙：两条共享端点的弧，保证严格闭合
+function crescentPath(cx, cy, rx, ry, n = 90) {
+  const p1 = { x: cx - rx * 0.62, y: cy - ry * 0.98 };
+  const p2 = { x: cx - rx * 0.62, y: cy + ry * 0.98 };
+  const bulge = (a, b, amount) => {
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      out.push({
+        x: a.x + (b.x - a.x) * t + Math.sin(Math.PI * t) * amount,
+        y: a.y + (b.y - a.y) * t
+      });
+    }
+    return out;
+  };
+  return bulge(p1, p2, rx * 1.62).concat(bulge(p2, p1, rx * 0.92));
+}
+// 云朵：一排圆的并集，从中心向各方向取最远交点
+function cloudPath(cx, cy, rx, ry, n = 180) {
+  const bumps = [
+    { x: -0.62, y: 0.20, r: 0.40 }, { x: -0.22, y: -0.14, r: 0.52 },
+    { x: 0.24, y: -0.08, r: 0.46 }, { x: 0.62, y: 0.20, r: 0.36 },
+    { x: 0.10, y: 0.36, r: 0.42 }, { x: -0.35, y: 0.40, r: 0.34 }
+  ];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const a = i / n * Math.PI * 2 - Math.PI / 2;
+    const ux = Math.cos(a), uy = Math.sin(a);
+    let best = Math.min(rx, ry) * 0.12;
+    for (const bp of bumps) {
+      const bx = cx + bp.x * rx, by = cy + bp.y * ry, r = bp.r * Math.min(rx, ry) * 1.35;
+      const dx = bx - cx, dy = by - cy;
+      const proj = dx * ux + dy * uy;
+      const h2 = r * r - (dx * dx + dy * dy - proj * proj);
+      if (h2 < 0) continue;
+      const t = proj + Math.sqrt(h2);
+      if (t > best) best = t;
+    }
+    out.push({ x: cx + ux * best, y: cy + uy * best });
+  }
+  return out;
+}
+
+// 把点集归一化到指定矩形内（保证图形不超出拖拽框）
+function fitToBox(pts, x0, y0, x1, y1) {
+  let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+  for (const p of pts) {
+    if (p.x < mnx) mnx = p.x; if (p.x > mxx) mxx = p.x;
+    if (p.y < mny) mny = p.y; if (p.y > mxy) mxy = p.y;
+  }
+  const sx = (mxx - mnx) || 1, sy = (mxy - mny) || 1;
+  return pts.map(p => ({
+    x: x0 + (p.x - mnx) / sx * (x1 - x0),
+    y: y0 + (p.y - mny) / sy * (y1 - y0)
+  }));
+}
+
+// 由拖拽的两个点生成图形（内部实现）
+function buildShapeRaw(tool, a, b, shift, alt) {
+  let x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+  let y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+  if (alt) {                                     // Alt：以起点为中心
+    const hw = Math.abs(b.x - a.x), hh = Math.abs(b.y - a.y);
+    x0 = a.x - hw; x1 = a.x + hw; y0 = a.y - hh; y1 = a.y + hh;
+  }
+  if (shift || tool === 'circle') {               // Shift / 圆：强制等比（正方形外框）
+    const s = Math.max(x1 - x0, y1 - y0);
+    const dx = (b.x >= a.x) ? 1 : -1, dy = (b.y >= a.y) ? 1 : -1;
+    if (alt) {
+      x0 = a.x - s / 2; x1 = a.x + s / 2; y0 = a.y - s / 2; y1 = a.y + s / 2;
+    } else {
+      const px = (dx > 0) ? x0 : x1, py = (dy > 0) ? y0 : y1;
+      x0 = (dx > 0) ? px : px - s; x1 = (dx > 0) ? px + s : px;
+      y0 = (dy > 0) ? py : py - s; y1 = (dy > 0) ? py + s : py;
+    }
+  }
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const rx = Math.max(1, (x1 - x0) / 2), ry = Math.max(1, (y1 - y0) / 2);
+  const L = Math.max(1, x1 - x0), H = Math.max(1, y1 - y0);
+
+  switch (tool) {
+    case 'line':
+      return { paths: [sampleLine(a, shift ? constrain45(a, b) : b)], closed: false, kind: 'line' };
+    case 'rect':
+      return { paths: [[{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }]], closed: true, kind: 'rect' };
+    case 'circle':
+    case 'ellipse':
+      return { paths: [ellipsePath(cx, cy, rx, ry)], closed: true, kind: tool };
+    case 'roundrect':
+      return { paths: [roundRectPath(x0, y0, x1, y1, Math.min(rx, ry) * 0.34)], closed: true, kind: 'roundrect' };
+    case 'diamond':
+      return { paths: [[{ x: cx, y: y0 }, { x: x1, y: cy }, { x: cx, y: y1 }, { x: x0, y: cy }]], closed: true, kind: 'diamond' };
+    case 'trapezoid': {
+      const k = L * 0.24;
+      return { paths: [[{ x: x0 + k, y: y0 }, { x: x1 - k, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }]], closed: true, kind: 'trapezoid' };
+    }
+    case 'parallelogram': {
+      const k = L * 0.26;
+      return { paths: [[{ x: x0 + k, y: y0 }, { x: x1, y: y0 }, { x: x1 - k, y: y1 }, { x: x0, y: y1 }]], closed: true, kind: 'parallelogram' };
+    }
+    case 'cross':
+      return { paths: [crossPath(x0, y0, x1, y1)], closed: true, kind: 'cross' };
+    case 'crescent':
+      return { paths: [fitToBox(crescentPath(cx, cy, rx, ry), x0, y0, x1, y1)], closed: true, kind: 'crescent' };
+    case 'cloud':
+      return { paths: [fitToBox(cloudPath(cx, cy, rx, ry), x0, y0, x1, y1)], closed: true, kind: 'cloud' };
+    case 'semicircle': {
+      const pts = [];
+      const n2 = 64;
+      for (let i = 0; i <= n2; i++) {
+        const ang = Math.PI + Math.PI * (i / n2);
+        pts.push({ x: cx + rx * Math.cos(ang), y: cy + ry * Math.sin(ang) });
+      }
+      return { paths: [pts], closed: true, kind: 'semicircle' };
+    }
+    case 'arc': {
+      const pts = [];
+      const n2 = 64;
+      for (let i = 0; i <= n2; i++) {
+        const ang = Math.PI * 0.75 + Math.PI * 1.5 * (i / n2);
+        pts.push({ x: cx + rx * Math.cos(ang), y: cy + ry * Math.sin(ang) });
+      }
+      return { paths: [pts], closed: false, kind: 'arc' };
+    }
+    case 'wave': {
+      const pts = [], n2 = 96;
+      for (let i = 0; i <= n2; i++) {
+        const t = i / n2;
+        pts.push({ x: x0 + L * t, y: cy - ry * Math.sin(t * Math.PI * 2) });
+      }
+      return { paths: [pts], closed: false, kind: 'wave' };
+    }
+    case 'spiral': {
+      const pts = [], n2 = 200, turns = 2.6;
+      const rr = Math.min(rx, ry);
+      for (let i = 0; i <= n2; i++) {
+        const t = i / n2;
+        const ang = t * turns * Math.PI * 2 - Math.PI / 2;
+        const rad = rr * (0.10 + 0.90 * t);
+        pts.push({ x: cx + rad * Math.cos(ang), y: cy + rad * Math.sin(ang) });
+      }
+      return { paths: [pts], closed: false, kind: 'spiral' };
+    }
+    case 'star6': return { paths: [starPath(cx, cy, rx, ry, 6, 0.56)], closed: true, kind: 'star6' };
+    case 'triangle': return { paths: [polygonPath(cx, cy, rx, ry, 3)], closed: true, kind: 'triangle' };
+    case 'pentagon': return { paths: [polygonPath(cx, cy, rx, ry, 5)], closed: true, kind: 'pentagon' };
+    case 'hexagon': return { paths: [polygonPath(cx, cy, rx, ry, 6)], closed: true, kind: 'hexagon' };
+    case 'star': return { paths: [starPath(cx, cy, rx, ry, 5)], closed: true, kind: 'star' };
+    case 'heart': return { paths: [heartPath(cx, cy, rx, ry)], closed: true, kind: 'heart' };
+    case 'arrow':
+    case 'darrow': {
+      const tip = shift ? constrain45(a, b) : b;
+      const len = Math.hypot(tip.x - a.x, tip.y - a.y);
+      if (len < 4) return null;
+      const hl = Math.max(8, Math.min(60, len * 0.28)) * arrowSize;   // 末端大小可调
+      const ang = Math.atan2(tip.y - a.y, tip.x - a.x);
+      const half = 0.42;
+      const headAt = (p, dir) => [
+        { x: p.x - hl * Math.cos(dir - half), y: p.y - hl * Math.sin(dir - half) },
+        { x: p.x, y: p.y },
+        { x: p.x - hl * Math.cos(dir + half), y: p.y - hl * Math.sin(dir + half) }
+      ];
+      const paths = [sampleLine(a, tip, 12), headAt(tip, ang)];
+      if (tool === 'darrow') paths.push(headAt(a, ang + Math.PI));
+      return { paths, closed: false, kind: tool };
+    }
+  }
+  return null;
+}
+
+// 对外入口：附加生成参数，便于之后按参数重建（如调整箭头末端大小）
+function buildShape(tool, a, b, shift, alt) {
+  const s = buildShapeRaw(tool, a, b, shift, alt);
+  if (s) s.src = { tool, a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, shift: !!shift, alt: !!alt };
+  return s;
+}
+
+function shapeExtent(s) {
+  let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+  for (const path of s.paths) for (const p of path) {
+    mnx = Math.min(mnx, p.x); mxx = Math.max(mxx, p.x);
+    mny = Math.min(mny, p.y); mxy = Math.max(mxy, p.y);
+  }
+  return Math.max(mxx - mnx, mxy - mny);
+}
+
+// ---- 选中 / 编辑 ----
+function segDist(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy || 1;
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
+}
+function shapeHit(s, p, tol = 11) {
+  for (const path of s.paths) {
+    for (let k = 1; k < path.length; k++) {
+      if (segDist(p, path[k - 1], path[k]) <= tol) return true;
+    }
+    if (s.closed && path.length > 2 && segDist(p, path[path.length - 1], path[0]) <= tol) return true;
+  }
+  return false;
+}
+function hitShape(p) {
+  for (let i = drawShapes.length - 1; i >= 0; i--) {
+    if (shapeHit(drawShapes[i], p)) return drawShapes[i];
+  }
+  return null;
+}
+
+// ---- 选区包围盒与缩放手柄 ----
+function selectionBBox() {
+  if (!selectedShapes.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const s of selectedShapes) for (const path of s.paths) for (const q of path) {
+    if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x;
+    if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y;
+  }
+  if (!isFinite(x0)) return null;
+  return { x0, y0, x1, y1 };
+}
+const HANDLE_PAD = 13;
+function handleAt(p) {
+  const bb = selectionBBox();
+  if (!bb) return null;
+  const spots = [['nw', bb.x0, bb.y0], ['ne', bb.x1, bb.y0], ['sw', bb.x0, bb.y1], ['se', bb.x1, bb.y1]];
+  for (const [name, x, y] of spots) {
+    if (Math.abs(p.x - x) <= HANDLE_PAD && Math.abs(p.y - y) <= HANDLE_PAD) return { name, x, y };
+  }
+  return null;
+}
+
+// ---- 图形级变换（同步维护 src，便于按参数重建箭头等） ----
+function mapShape(s, f) {
+  s.paths = s.paths.map(pa => pa.map(f));
+  if (s.src) { s.src.a = f({ x: s.src.a.x, y: s.src.a.y }); s.src.b = f({ x: s.src.b.x, y: s.src.b.y }); }
+}
+function translateShape(s, dx, dy) { mapShape(s, q => ({ x: q.x + dx, y: q.y + dy })); }
+function scaleShapeAbout(s, ax, ay, sx, sy) {
+  mapShape(s, q => ({ x: ax + (q.x - ax) * sx, y: ay + (q.y - ay) * sy }));
+}
+function scaleSelection(sx, sy) {
+  const bb = selectionBBox();
+  if (!bb) return;
+  pushHistory();
+  const cx = (bb.x0 + bb.x1) / 2, cy = (bb.y0 + bb.y1) / 2;
+  for (const s of selectedShapes) scaleShapeAbout(s, cx, cy, sx, sy);
+  previewCache = [];
+  updateDrawInfo();
+}
+
+// ---- 旋转（可指定旋转中心） ----
+function currentPivot() {                      // 未自定义时用选区中心
+  if (pivot) return pivot;
+  const bb = selectionBBox();
+  if (bb) return { x: (bb.x0 + bb.x1) / 2, y: (bb.y0 + bb.y1) / 2 };
+  return { x: mainView.cx, y: mainView.cy };
+}
+function rotPt(q, pv, c, sn) {
+  return {
+    x: pv.x + (q.x - pv.x) * c - (q.y - pv.y) * sn,
+    y: pv.y + (q.x - pv.x) * sn + (q.y - pv.y) * c
+  };
+}
+function rotateShapeAbout(s, pv, ang) {
+  const c = Math.cos(ang), sn = Math.sin(ang);
+  mapShape(s, q => rotPt(q, pv, c, sn));
+}
+function rotateSelection(ang) {
+  if (!selectedShapes.length) return;
+  pushHistory();
+  const pv = currentPivot();
+  for (const s of selectedShapes) rotateShapeAbout(s, pv, ang);
+  previewCache = [];
+  updateDrawInfo();
+}
+function rotationHandles() {                   // 四角外侧的旋转手柄
+  const bb = selectionBBox();
+  if (!bb) return [];
+  const off = 26;
+  return [[bb.x0 - off, bb.y0 - off], [bb.x1 + off, bb.y0 - off],
+          [bb.x0 - off, bb.y1 + off], [bb.x1 + off, bb.y1 + off]];
+}
+function rotHandleAt(p) {
+  for (const [x, y] of rotationHandles()) {
+    if (Math.hypot(p.x - x, p.y - y) <= 13) return { x, y };
+  }
+  return null;
+}
+function pivotHit(p) {                         // 旋转中心准星（可拖动）
+  if (!selectedShapes.length) return false;
+  const pv = currentPivot();
+  return Math.hypot(p.x - pv.x, p.y - pv.y) <= 13;
+}
+function snapshotSelection() {
+  return {
+    pivot: currentPivot(),
+    orig: selectedShapes.map(s => JSON.parse(JSON.stringify(s.paths))),
+    origSrc: selectedShapes.map(s => (s.src ? JSON.parse(JSON.stringify(s.src)) : null))
+  };
+}
+function applyRotationFrom(snap, ang) {
+  const pv = snap.pivot, c = Math.cos(ang), sn = Math.sin(ang);
+  const f = q => rotPt(q, pv, c, sn);
+  selectedShapes.forEach((s, i) => {
+    s.paths = snap.orig[i].map(pa => pa.map(f));
+    const os = snap.origSrc[i];
+    if (os) s.src = { tool: os.tool, shift: os.shift, alt: os.alt, a: f(os.a), b: f(os.b) };
+  });
+  previewCache = [];
+  updateDrawInfo();
+}
+
+function pushHistory() {
+  history = history.slice(0, historyIdx + 1);
+  history.push(JSON.stringify(drawShapes));
+  historyIdx = history.length - 1;
+  if (history.length > 80) { history.shift(); historyIdx--; }
+  updateDrawInfo();
+}
+function undoDraw() {
+  if (historyIdx <= 0) return;
+  historyIdx--;
+  drawShapes = JSON.parse(history[historyIdx]);
+  selectedShapes = [];
+  previewCache = [];
+  updateDrawInfo();
+}
+function redoDraw() {
+  if (historyIdx >= history.length - 1) return;
+  historyIdx++;
+  drawShapes = JSON.parse(history[historyIdx]);
+  selectedShapes = [];
+  previewCache = [];
+  updateDrawInfo();
+}
+function deleteSelected() {
+  if (!selectedShapes.length) return;
+  pushHistory();
+  drawShapes = drawShapes.filter(s => selectedShapes.indexOf(s) < 0);
+  selectedShapes = [];
+  previewCache = [];
+  updateDrawInfo();
+}
+function duplicateSelected() {
+  if (!selectedShapes.length) return;
+  pushHistory();
+  const copies = selectedShapes.map(s => {
+    const c = JSON.parse(JSON.stringify(s));
+    translateShape(c, 20, 20);
+    return c;
+  });
+  drawShapes.push(...copies);
+  selectedShapes = copies;
+  previewCache = [];
+  updateDrawInfo();
+}
+function mirrorSelected(dir) {                 // 复制并关于画布中线镜像
+  if (!selectedShapes.length) return;
+  pushHistory();
+  const axis = (dir === 'h') ? mainView.cx : mainView.cy;
+  const copies = selectedShapes.map(s => {
+    const c = JSON.parse(JSON.stringify(s));
+    mapShape(c, q => (dir === 'h') ? { x: axis * 2 - q.x, y: q.y } : { x: q.x, y: axis * 2 - q.y });
+    return c;
+  });
+  drawShapes.push(...copies);
+  selectedShapes = copies;
+  previewCache = [];
+  updateDrawInfo();
+}
+function nudgeSelected(dx, dy) {
+  if (!selectedShapes.length) return;
+  pushHistory();
+  for (const s of selectedShapes) translateShape(s, dx, dy);
+  previewCache = [];
+}
+function updateSelectedArrows() {              // 调整箭头末端大小时即时更新已选中的箭头
+  let changed = false;
+  for (const s of selectedShapes) {
+    if (s.src && (s.src.tool === 'arrow' || s.src.tool === 'darrow')) {
+      const rebuilt = buildShapeRaw(s.src.tool, s.src.a, s.src.b, s.src.shift, s.src.alt);
+      if (rebuilt) {
+        s.paths = rebuilt.paths;
+        s.closed = rebuilt.closed;
+        s.kind = rebuilt.kind;
+        changed = true;
+      }
+    }
+  }
+  if (changed) previewCache = [];
+  return changed;
+}
+function selectAll() {
+  selectedShapes = drawShapes.slice();
+  updateDrawInfo();
+}
+function updateDrawInfo() {
+  if (!drawing) { drawInfo.textContent = ''; return; }
+  const n = drawShapes.length, m = selectedShapes.length;
+  let txt = `${n} 个图形${m ? ` · 已选中 ${m}` : ''}${currentTool === 'eraser' ? ' · 橡皮擦' : ''}`;
+  if (m) {
+    const pv = currentPivot();
+    txt += ` · 旋转中心 (${Math.round(pv.x)}, ${Math.round(pv.y)})`;
+  }
+  drawInfo.textContent = txt;
+}
+
+// ---- 橡皮擦：把线段在半径内的点挖掉，剩余部分拆成若干开放片段 ----
+function segDist2(p, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy || 1;
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const ex = p.x - (a.x + dx * t), ey = p.y - (a.y + dy * t);
+  return ex * ex + ey * ey;
+}
+function densify(path, step, closed) {
+  const pts = closed ? path.concat([path[0]]) : path;
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const d = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.max(1, Math.ceil(d / step));
+    for (let k = 0; k < n; k++) {
+      out.push({ x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n });
+    }
+  }
+  if (!closed) out.push({ x: pts[pts.length - 1].x, y: pts[pts.length - 1].y });
+  return out;
+}
+function runLength(run) {
+  let len = 0;
+  for (let i = 1; i < run.length; i++) len += Math.hypot(run[i].x - run[i - 1].x, run[i].y - run[i - 1].y);
+  return len;
+}
+function eraseSegment(a, b, radius) {
+  if (!a || !b) return false;
+  const r2 = radius * radius;
+  let changed = false;
+  const kept = [];
+  for (const s of drawShapes) {
+    const newPaths = [];
+    let shapeChanged = false;
+    for (const path of s.paths) {
+      if (path.length < 2) continue;
+      const dense = densify(path, 3, s.closed);
+      const n = dense.length;
+      let anyHit = false;
+      const alive = new Array(n);
+      for (let i = 0; i < n; i++) {
+        const hit = segDist2(dense[i], a, b) <= r2;
+        alive[i] = !hit;
+        if (hit) anyHit = true;
+      }
+      if (!anyHit) { newPaths.push(path); continue; }
+      shapeChanged = true;
+      let runs = [];
+      if (s.closed) {
+        // 环形：从第一个被擦除的点之后开始，绕一圈收集连续片段
+        let start = -1;
+        for (let i = 0; i < n; i++) if (!alive[i]) { start = i; break; }
+        if (start < 0) { newPaths.push(path); continue; }
+        let cur = [];
+        for (let k = 0; k < n; k++) {
+          const i = (start + 1 + k) % n;
+          if (alive[i]) cur.push(dense[i]);
+          else if (cur.length) { runs.push(cur); cur = []; }
+        }
+        if (cur.length) runs.push(cur);
+      } else {
+        let cur = [];
+        for (let i = 0; i < n; i++) {
+          if (alive[i]) cur.push(dense[i]);
+          else if (cur.length) { runs.push(cur); cur = []; }
+        }
+        if (cur.length) runs.push(cur);
+      }
+      for (const run of runs) {
+        if (run.length >= 2 && runLength(run) >= 6) newPaths.push(run);
+      }
+    }
+    if (shapeChanged) changed = true;
+    s.paths = newPaths;
+    if (shapeChanged) s.closed = false;              // 被擦断后按开放笔画处理
+    if (newPaths.length) kept.push(s);
+  }
+  if (changed) {
+    drawShapes = kept;
+    selectedShapes = [];
+    previewCache = [];
+  }
+  return changed;
+}
+function showToast(text, ms = 3200) {
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toastEl.classList.remove('show'), ms);
+}
+
+// 把任意坐标系的路径缩放到画布中央（与动画中的显示尺寸一致）
+function pathsToCanvas(paths) {
+  let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+  for (const pa of paths) for (const p of pa) {
+    mnx = Math.min(mnx, p.x); mxx = Math.max(mxx, p.x);
+    mny = Math.min(mny, p.y); mxy = Math.max(mxy, p.y);
+  }
+  const s = Math.max(mxx - mnx, mxy - mny) || 1;
+  const scale = (Math.min(W, H) * 0.60) / s;         // 动画里图形占短边的 60%
+  const ox = (mnx + mxx) / 2, oy = (mny + mxy) / 2;
+  return paths.map(pa => pa.map(p => ({
+    x: (p.x - ox) * scale + W / 2,
+    y: (p.y - oy) * scale + H / 2
+  })));
+}
+function syncToolButtons() {
+  document.querySelectorAll('.drawbar button[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === currentTool));
+}
+function autoClosed(pts) {                     // 首尾接近则视为闭合图形
+  const a = pts[0], b = pts[pts.length - 1];
+  let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity;
+  for (const p of pts) {
+    mnx = Math.min(mnx, p.x); mxx = Math.max(mxx, p.x);
+    mny = Math.min(mny, p.y); mxy = Math.max(mxy, p.y);
+  }
+  const diag = Math.hypot(mxx - mnx, mxy - mny);
+  return Math.hypot(a.x - b.x, a.y - b.y) < Math.max(24, diag * 0.22);
+}
+
+function setDrawMode(on) {
+  drawing = on;
+  hint.classList.toggle('show', on);
+  btnDraw.textContent = on ? '✔ 完成绘制' : '✏️ 绘图 / 组合';
+  drawBar.classList.toggle('show', on);
+  if (on) {
+    if (!drawShapes.length) { history = []; historyIdx = -1; pushHistory(); }  // 首次进入建空快照
+    selectedShapes = []; dragState = null; freehand = []; eraserPos = null;    // 保留已画图形，可继续编辑
+    syncToolButtons();
+    clearTrails(); t = 0; playing = false; updatePlayBtn();
+    updateDrawInfo();
+  } else {
+    toastEl.classList.remove('show');
+    rotBaseline = null;
+    const rs = document.getElementById('rotAngle');
+    if (rs) rs.value = 0;
+  }
+  resize();                                       // 工具栏出现/消失会改变可用高度
+}
+
+function finishDrawing() {
+  const raws = [];
+  for (const s of drawShapes) {
+    for (const path of s.paths) {
+      if (path.length < 2) continue;
+      raws.push(s.closed ? path : openToClosed(path));
+    }
+  }
+  if (raws.length) setShapes(raws);
+  setDrawMode(false);
+}
+
+document.getElementById('drawBar').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-tool]');
+  if (!b) return;
+  currentTool = b.dataset.tool;
+  selectedShapes = [];
+  eraserPos = null;
+  syncToolButtons();
+  updateDrawInfo();
+});
+document.getElementById('snapGrid').addEventListener('change', (e) => { snapGrid = e.target.checked; });
+document.getElementById('showGrid').addEventListener('change', (e) => { showGrid = e.target.checked; });
+document.getElementById('eraserSize').addEventListener('input', (e) => { eraserSize = parseInt(e.target.value, 10); });
+document.getElementById('arrowSize').addEventListener('input', (e) => {
+  arrowSize = parseFloat(e.target.value);
+  updateSelectedArrows();
+});
+document.getElementById('arrowSize').addEventListener('change', () => { pushHistory(); });
+
+// ---- 旋转相关控件 ----
+document.getElementById('btnRotL').addEventListener('click', (e) => {
+  rotateSelection(-(e.shiftKey ? 5 : 15) * Math.PI / 180);
+});
+document.getElementById('btnRotR').addEventListener('click', (e) => {
+  rotateSelection((e.shiftKey ? 5 : 15) * Math.PI / 180);
+});
+{
+  const rs = document.getElementById('rotAngle');
+  rs.addEventListener('input', (e) => {
+    if (!selectedShapes.length) { rs.value = 0; return; }
+    if (!rotBaseline) rotBaseline = snapshotSelection();   // 首次拖动时记录基准
+    applyRotationFrom(rotBaseline, parseFloat(e.target.value) * Math.PI / 180);
+  });
+  rs.addEventListener('change', () => { rotBaseline = null; rs.value = 0; });
+}
+document.getElementById('btnPivotSel').addEventListener('click', () => {
+  pivot = null;
+  updateDrawInfo();
+  showToast('旋转中心已设为「选区中心」', 1800);
+});
+document.getElementById('btnPivotCanvas').addEventListener('click', () => {
+  pivot = { x: mainView.cx, y: mainView.cy };
+  updateDrawInfo();
+  showToast('旋转中心已设为「画布中心」', 1800);
+});
+document.getElementById('btnUndo').addEventListener('click', undoDraw);
+document.getElementById('btnRedo').addEventListener('click', redoDraw);
+document.getElementById('btnSelAll').addEventListener('click', selectAll);
+document.getElementById('btnDup').addEventListener('click', duplicateSelected);
+document.getElementById('btnMirrorH').addEventListener('click', () => mirrorSelected('h'));
+document.getElementById('btnMirrorV').addEventListener('click', () => mirrorSelected('v'));
+document.getElementById('btnDelSel').addEventListener('click', deleteSelected);
+document.getElementById('btnClearAll').addEventListener('click', () => {
+  if (!drawShapes.length) return;
+  pushHistory();
+  drawShapes = []; selectedShapes = []; previewCache = []; updateDrawInfo();
+});
+
+document.getElementById('presets').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-preset]');
+  if (!btn) return;
+  document.querySelectorAll('#presets button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  setDrawMode(false);
+  setShapes(PRESETS[btn.dataset.preset]());
+});
+
+btnDraw.addEventListener('click', () => { drawing ? finishDrawing() : setDrawMode(true); });
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button === 1 || spaceDown) {             // 中键 / 空格 = 平移视图
+    panState = { x: e.offsetX, y: e.offsetY, px: viewPanX, py: viewPanY };
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+  if (!drawing) return;
+  const raw = screenToBase({ x: e.offsetX, y: e.offsetY });
+  canvas.setPointerCapture(e.pointerId);
+
+  // 1) 旋转手柄 → 旋转中心 → 缩放手柄（优先级从高到低）
+  const rh = rotHandleAt(raw);
+  if (rh && selectedShapes.length) {
+    pushHistory();
+    const snap = snapshotSelection();
+    dragState = {
+      mode: 'rotate', snap, ang: 0,
+      a0: Math.atan2(raw.y - snap.pivot.y, raw.x - snap.pivot.x)
+    };
+    return;
+  }
+  if (currentTool === 'select' && pivotHit(raw)) {      // 拖动准星指定旋转中心
+    pushHistory();
+    pivot = (snapGrid && !e.altKey) ? snapPt(raw) : { x: raw.x, y: raw.y };
+    dragState = { mode: 'pivot' };
+    updateDrawInfo();
+    return;
+  }
+  const h = handleAt(raw);
+  if (h && selectedShapes.length) {
+    pushHistory();
+    const bb = selectionBBox();
+    const anchor = e.altKey
+      ? { x: (bb.x0 + bb.x1) / 2, y: (bb.y0 + bb.y1) / 2 }
+      : { x: h.name.indexOf('w') >= 0 ? bb.x1 : bb.x0, y: h.name.indexOf('n') >= 0 ? bb.y1 : bb.y0 };
+    dragState = {
+      mode: 'scale', anchor, corner: { x: h.x, y: h.y }, sx: 1, sy: 1,
+      orig: selectedShapes.map(s => JSON.parse(JSON.stringify(s.paths))),
+      origSrc: selectedShapes.map(s => (s.src ? JSON.parse(JSON.stringify(s.src)) : null))
+    };
+    return;
+  }
+
+  if (currentTool === 'eraser') {
+    pushHistory();
+    eraserPos = raw;
+    dragState = { mode: 'erase', last: raw };
+    eraseSegment(raw, raw, eraserSize);
+    return;
+  }
+  if (currentTool === 'select') {
+    const hit = hitShape(raw);
+    const multi = e.shiftKey || e.ctrlKey || e.metaKey;
+    if (hit) {
+      if (multi) {
+        const i = selectedShapes.indexOf(hit);
+        if (i >= 0) selectedShapes.splice(i, 1); else selectedShapes.push(hit);
+      } else if (selectedShapes.indexOf(hit) < 0) {
+        selectedShapes = [hit];
+        pivot = null;                              // 换了选区 → 旋转中心回到选区中心
+      }
+    } else if (!multi) {
+      selectedShapes = [];
+      pivot = null;
+    }
+    dragState = (hit && selectedShapes.length)
+      ? {
+        mode: 'move', start: raw, moved: false,
+        orig: selectedShapes.map(s => JSON.parse(JSON.stringify(s.paths))),
+        origSrc: selectedShapes.map(s => (s.src ? JSON.parse(JSON.stringify(s.src)) : null))
+      }
+      : null;
+    updateDrawInfo();
+    return;
+  }
+  // 2) 任何绘制工具下，按在「已选中」的图形上都能直接拖动它
+  if (selectedShapes.length) {
+    for (let i = selectedShapes.length - 1; i >= 0; i--) {
+      if (shapeHit(selectedShapes[i], raw)) {
+        dragState = {
+          mode: 'move', start: raw, moved: false,
+          orig: selectedShapes.map(s => JSON.parse(JSON.stringify(s.paths))),
+          origSrc: selectedShapes.map(s => (s.src ? JSON.parse(JSON.stringify(s.src)) : null))
+        };
+        return;
+      }
+    }
+  }
+  if (currentTool === 'free') {
+    freehand = [raw];
+    dragState = { mode: 'free' };
+    return;
+  }
+  const p = snapPt(raw);
+  dragState = { mode: 'create', a: p, b: p, shift: e.shiftKey, alt: e.altKey };
+});
+canvas.addEventListener('pointerleave', () => { eraserPos = null; });
+canvas.addEventListener('pointermove', (e) => {
+  if (panState) {                                 // 平移视图
+    viewPanX = panState.px + (e.offsetX - panState.x);
+    viewPanY = panState.py + (e.offsetY - panState.y);
+    return;
+  }
+  if (!drawing) return;
+  const raw = screenToBase({ x: e.offsetX, y: e.offsetY });
+  if (currentTool === 'eraser') eraserPos = raw;
+  if (!dragState) return;
+
+  if (dragState.mode === 'rotate') {                  // 拖手柄旋转
+    const pv = dragState.snap.pivot;
+    let ang = Math.atan2(raw.y - pv.y, raw.x - pv.x) - dragState.a0;
+    if (e.shiftKey) {                                 // 吸附到 15° 整数倍
+      const step = Math.PI / 12;
+      ang = Math.round(ang / step) * step;
+    }
+    dragState.ang = ang;
+    applyRotationFrom(dragState.snap, ang);
+    return;
+  }
+  if (dragState.mode === 'pivot') {                   // 拖准星指定旋转中心
+    pivot = (snapGrid && !e.altKey) ? snapPt(raw) : { x: raw.x, y: raw.y };
+    updateDrawInfo();
+    return;
+  }
+  if (dragState.mode === 'scale') {
+    const p = (snapGrid && !e.altKey) ? snapPt(raw) : raw;
+    const { anchor, corner } = dragState;
+    let sx = (corner.x - anchor.x) !== 0 ? (p.x - anchor.x) / (corner.x - anchor.x) : 1;
+    let sy = (corner.y - anchor.y) !== 0 ? (p.y - anchor.y) / (corner.y - anchor.y) : 1;
+    if (e.shiftKey) {
+      const k = Math.max(Math.abs(sx), Math.abs(sy));
+      sx = (sx < 0 ? -k : k); sy = (sy < 0 ? -k : k);
+    }
+    sx = Math.max(0.02, Math.min(40, sx));
+    sy = Math.max(0.02, Math.min(40, sy));
+    dragState.sx = sx; dragState.sy = sy;
+    const f = q => ({ x: anchor.x + (q.x - anchor.x) * sx, y: anchor.y + (q.y - anchor.y) * sy });
+    selectedShapes.forEach((s, i) => {
+      s.paths = dragState.orig[i].map(pa => pa.map(f));
+      const os = dragState.origSrc[i];
+      if (os) s.src = { tool: os.tool, shift: os.shift, alt: os.alt, a: f(os.a), b: f(os.b) };
+    });
+    previewCache = [];
+    return;
+  }
+  if (dragState.mode === 'erase') {
+    eraseSegment(dragState.last, raw, eraserSize);
+    dragState.last = raw;
+    return;
+  }
+  if (dragState.mode === 'free') {
+    const last = freehand[freehand.length - 1];
+    if (Math.hypot(raw.x - last.x, raw.y - last.y) > 2) freehand.push(raw);
+    return;
+  }
+  if (dragState.mode === 'create') {
+    dragState.b = snapPt(raw);
+    dragState.shift = e.shiftKey;
+    dragState.alt = e.altKey;
+    return;
+  }
+  if (dragState.mode === 'move' && selectedShapes.length) {
+    if (!dragState.moved) { pushHistory(); dragState.moved = true; }
+    let dx = raw.x - dragState.start.x, dy = raw.y - dragState.start.y;
+    if (snapGrid && !e.altKey) { dx = Math.round(dx / GRID) * GRID; dy = Math.round(dy / GRID) * GRID; }
+    selectedShapes.forEach((s, i) => {
+      s.paths = dragState.orig[i].map(pa => pa.map(q => ({ x: q.x + dx, y: q.y + dy })));
+      const os = dragState.origSrc[i];
+      if (os) {
+        s.src = {
+          tool: os.tool, shift: os.shift, alt: os.alt,
+          a: { x: os.a.x + dx, y: os.a.y + dy }, b: { x: os.b.x + dx, y: os.b.y + dy }
+        };
+      }
+    });
+    previewCache = [];
+  }
+});
+canvas.addEventListener('pointerup', () => {
+  if (panState) { panState = null; return; }
+  if (!drawing || !dragState) return;
+  const st = dragState;
+  dragState = null;
+  if (st.mode === 'erase') { updateDrawInfo(); return; }
+  if (st.mode === 'scale' || st.mode === 'rotate' || st.mode === 'pivot') { updateDrawInfo(); return; }
+  if (st.mode === 'free') {
+    if (freehand.length >= 3) {
+      pushHistory();
+      const s = { paths: [freehand.slice()], closed: autoClosed(freehand), kind: 'free' };
+      drawShapes.push(s);
+      selectedShapes = [s];
+      previewCache = [];
+    }
+    freehand = [];
+    updateDrawInfo();
+    return;
+  }
+  if (st.mode === 'create') {
+    const built = buildShape(currentTool, st.a, st.b, st.shift, st.alt);
+    if (built && shapeExtent(built) > 6) {
+      pushHistory();
+      drawShapes.push(built);
+      selectedShapes = [built];
+      previewCache = [];
+    }
+    updateDrawInfo();
+  }
+});
+
+circlesInput.addEventListener('input', (e) => {
+  numCircles = parseInt(e.target.value, 10);
+  circlesNumInput.value = numCircles;
+  applyCircleCount();
+});
+circlesNumInput.addEventListener('input', () => {
+  const v = parseInt(circlesNumInput.value, 10);
+  if (!isNaN(v) && v >= 1 && v <= SAMPLE_N) {
+    numCircles = v;
+    circlesInput.value = v;
+    applyCircleCount();
+  }
+});
+circlesNumInput.addEventListener('change', () => {
+  let v = parseInt(circlesNumInput.value, 10);
+  if (isNaN(v)) v = numCircles;
+  v = Math.max(1, Math.min(SAMPLE_N, v));
+  numCircles = v;
+  circlesNumInput.value = v;
+  circlesInput.value = v;
+  applyCircleCount();
+});
+document.getElementById('speed').addEventListener('input', (e) => {
+  speed = parseFloat(e.target.value);
+  speedLabel.textContent = speed.toFixed(1) + '×';
+});
+document.getElementById('showCircles').addEventListener('change', (e) => { showCircles = e.target.checked; });
+document.getElementById('showLabels').addEventListener('change', (e) => { showLabels = e.target.checked; });
+document.getElementById('showTrace').addEventListener('change', (e) => { showTrace = e.target.checked; });
+document.getElementById('showPreview').addEventListener('change', (e) => {
+  showPreview = e.target.checked;
+  if (showPreview) rebuildPreview();
+});
+document.getElementById('btnReplay').addEventListener('click', () => { t = 0; clearTrails(); playing = true; updatePlayBtn(); });
+document.getElementById('btnClear').addEventListener('click', () => { clearTrails(); });
+btnPlay.addEventListener('click', () => { playing = !playing; updatePlayBtn(); });
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {                       // 空格：动画时播放/暂停，绘图时作为平移修饰键
+    e.preventDefault();
+    if (drawing) { spaceDown = true; return; }
+    playing = !playing; updatePlayBtn();
+    return;
+  }
+  if (e.ctrlKey && e.code === 'Digit0') { e.preventDefault(); resetView(); return; }
+  if (drawing) {                                   // 绘图模式的快捷键
+    if (e.code === 'Delete' || e.code === 'Backspace') { e.preventDefault(); deleteSelected(); return; }
+    if (e.code === 'Escape') { selectedShapes = []; updateDrawInfo(); return; }
+    if (e.ctrlKey && e.code === 'KeyA') { e.preventDefault(); selectAll(); return; }
+    if (e.ctrlKey && e.code === 'KeyZ') { e.preventDefault(); e.shiftKey ? redoDraw() : undoDraw(); return; }
+    if (e.ctrlKey && e.code === 'KeyY') { e.preventDefault(); redoDraw(); return; }
+    if (e.ctrlKey && e.code === 'KeyD') { e.preventDefault(); duplicateSelected(); return; }
+    if (e.code.indexOf('Arrow') === 0) {
+      const step = e.shiftKey ? 10 : 1;
+      const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.code];
+      if (d && selectedShapes.length) { e.preventDefault(); nudgeSelected(d[0], d[1]); }
+      return;
+    }
+    if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.code === 'Minus' || e.code === 'NumpadSubtract') {
+      if (!selectedShapes.length) return;
+      e.preventDefault();
+      const f = (e.code === 'Minus' || e.code === 'NumpadSubtract') ? 0.9 : 1.1;
+      scaleSelection(f, f);
+      return;
+    }
+    if (e.code === 'BracketLeft' || e.code === 'BracketRight') {   // [ / ] 旋转
+      if (!selectedShapes.length) return;
+      e.preventDefault();
+      const step = (e.shiftKey ? 5 : 15) * Math.PI / 180;
+      rotateSelection(e.code === 'BracketLeft' ? -step : step);
+      return;
+    }
+    return;
+  }
+  if (e.code === 'Escape' && focusMode) {
+    focusMode = false;
+    document.body.classList.remove('focus');
+    document.getElementById('btnFocus').textContent = '⛶ 专注';
+    resize();
+    return;
+  }
+});
+window.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = false; });
+window.addEventListener('blur', () => { spaceDown = false; panState = null; });
+window.addEventListener('resize', resize);
+
+// ============================================================
+//  作品保存 / 载入（JSON）
+// ============================================================
+function saveWork() {
+  if (!currentPaths.length) { alert('当前还没有图形可以保存。'); return; }
+  const data = { version: 1, circles: numCircles, paths: currentPaths };
+  downloadBlob(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'fourier-shape.json');
+}
+document.getElementById('btnSave').addEventListener('click', saveWork);
+document.getElementById('btnLoad').addEventListener('click', () => loadInput.click());
+loadInput.addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    const paths = (data.paths || []).map(pa => pa.map(q => ({ x: +q.x, y: +q.y })));
+    if (!paths.length) throw new Error('文件里没有图形数据');
+    setDrawMode(false);
+    setShapes(paths);
+    if (data.circles) {
+      numCircles = Math.max(1, Math.min(SAMPLE_N, data.circles | 0));
+      circlesInput.value = numCircles;
+      circlesNumInput.value = numCircles;
+      applyCircleCount();
+    }
+  } catch (err) {
+    console.error(err);
+    alert('载入失败：' + err.message);
+  }
+});
+
+// ============================================================
+//  图片上传 → 提取多条轮廓（前景连通块外轮廓 + 内部孔洞轮廓）
+// ============================================================
+btnUpload.addEventListener('click', () => fileInput.click());
+document.getElementById('recogMode').addEventListener('change', (e) => { recogMode = e.target.value; });
+document.getElementById('detailSel').addEventListener('change', (e) => { maxContours = parseInt(e.target.value, 10); });
+fileInput.addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try { await handleUpload(f); } catch (err) {
+    console.error(err);
+    alert('图片处理失败：' + err.message);
+  }
+});
+
+async function handleUpload(file) {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('无法读取图片')); img.src = url; });
+  URL.revokeObjectURL(url);
+
+  setBusy(true, '正在识别线条…');
+  await tick();                                   // 先让遮罩显示出来
+  let result;
+  try {
+    result = extractPaths(img, recogMode);
+  } finally {
+    setBusy(false);
+  }
+  if (!result.paths.length) {
+    alert('未能识别出线条。请上传主体与背景对比明显的图片（剪影、Logo、简笔画、线稿），或手动切换「识别」方式。');
+    return;
+  }
+  setDrawMode(false);
+  setShapes(result.paths, result.sampleN);
+
+  // 把识别出的线条转成可编辑图形：可在绘图模式里擦除 / 移动 / 补充绘制
+  drawShapes = pathsToCanvas(result.paths.map(r => Array.isArray(r) ? r : r.pts))
+    .map(pa => ({ paths: [pa], closed: true, kind: 'upload' }));
+  selectedShapes = [];
+  history = []; historyIdx = -1; pushHistory();
+  previewCache = [];
+  showToast(`已提取 ${drawShapes.length} 条线条 · 点「✏️ 绘图 / 组合」可擦除或补充绘制`, 5600);
+}
+
+// 8/4 连通分量标记
+function labelComponents(mask, w, h, conn8) {
+  const label = new Int32Array(w * h).fill(-1);
+  const queue = new Int32Array(w * h);
+  const comps = [];
+  const nb = conn8
+    ? [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+    : [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  let cur = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (!mask[i] || label[i] !== -1) continue;
+    let head = 0, tail = 0, size = 0;
+    queue[tail++] = i; label[i] = cur;
+    while (head < tail) {
+      const p = queue[head++]; size++;
+      const x = p % w, y = (p / w) | 0;
+      for (const [dx, dy] of nb) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const np = ny * w + nx;
+        if (mask[np] && label[np] === -1) { label[np] = cur; queue[tail++] = np; }
+      }
+    }
+    comps.push({ label: cur, size });
+    cur++;
+  }
+  return { label, comps, count: cur };
+}
+
+// 生成前景掩码（降采样 + 与四角背景色比较 / alpha 阈值）
+function buildForeground(img) {
+  const MAX = EXTRACT_MAX;
+  const s = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(8, Math.round(img.naturalWidth * s));
+  const h = Math.max(8, Math.round(img.naturalHeight * s));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0, w, h);
+  const data = g.getImageData(0, 0, w, h).data;
+
+  // 背景 ≈ 四角平均色
+  const corners = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]];
+  let br = 0, bg = 0, bb = 0, ba = 0;
+  for (const [cx2, cy2] of corners) {
+    const i = (cy2 * w + cx2) * 4;
+    br += data[i]; bg += data[i + 1]; bb += data[i + 2]; ba += data[i + 3];
+  }
+  br /= 4; bg /= 4; bb /= 4; ba /= 4;
+  const useAlpha = ba < 200;
+
+  const raw = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    let fg;
+    if (useAlpha) fg = data[i * 4 + 3] >= 128;
+    else {
+      const dr = data[i * 4] - br, dg = data[i * 4 + 1] - bg, db = data[i * 4 + 2] - bb;
+      fg = dr * dr + dg * dg + db * db > 45 * 45;
+    }
+    raw[i] = fg ? 1 : 0;
+  }
+  return { mask: raw, w, h };
+}
+
+// 轮廓模式：前景连通块外轮廓 + 内部孔洞轮廓（适合实心图案、剪影、Logo）
+function extractContourPaths(raw, w, h) {
+  const total = w * h;
+  const minOuter = Math.max(24, Math.round(total * 0.0006));
+  const minHole = Math.max(40, Math.round(total * 0.0012));
+  const cands = [];
+
+  // 1) 前景连通块 → 外轮廓
+  const fgLab = labelComponents(raw, w, h, true);
+  for (const comp of fgLab.comps) {
+    if (comp.size >= minOuter) cands.push({ kind: 'fg', label: comp.label, size: comp.size });
+  }
+  // 2) 背景连通块（4 连通，排除与画布边界相连的外部）→ 孔洞轮廓
+  const bgMask = new Uint8Array(total);
+  for (let i = 0; i < total; i++) bgMask[i] = raw[i] ? 0 : 1;
+  const bgLab = labelComponents(bgMask, w, h, false);
+  const exterior = new Set();
+  for (let x = 0; x < w; x++) { exterior.add(bgLab.label[x]); exterior.add(bgLab.label[(h - 1) * w + x]); }
+  for (let y = 0; y < h; y++) { exterior.add(bgLab.label[y * w]); exterior.add(bgLab.label[y * w + w - 1]); }
+  for (const comp of bgLab.comps) {
+    if (exterior.has(comp.label)) continue;
+    if (comp.size >= minHole) cands.push({ kind: 'bg', label: comp.label, size: comp.size });
+  }
+
+  cands.sort((a, b) => b.size - a.size);
+
+  const paths = [];
+  for (const cand of cands) {
+    if (paths.length >= maxContours) break;
+    const src = cand.kind === 'fg' ? fgLab.label : bgLab.label;
+    const m = new Uint8Array(total);
+    for (let i = 0; i < total; i++) m[i] = (src[i] === cand.label) ? 1 : 0;
+    const boundary = traceMoore(m, w, h);
+    if (!boundary || boundary.length < 12) continue;
+    paths.push({ pts: smoothPoints(simplifyDP(boundary, 1.2), 2) });
+  }
+  paths.sort((a, b) => b.pts.length - a.pts.length);
+  return paths;
+}
+
+// ============================================================
+//  线稿模式：笔画中心线（骨架化）
+// ============================================================
+// 两遍倒角距离变换（近似欧氏距离）
+function chamferDistance(mask, w, h) {
+  const INF = 1e9, A = 1, B = 1.41421356;
+  const d = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) d[i] = mask[i] ? INF : 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (d[i] === 0) continue;
+      let best = d[i];
+      if (x > 0) best = Math.min(best, d[i - 1] + A);
+      if (y > 0) {
+        best = Math.min(best, d[i - w] + A);
+        if (x > 0) best = Math.min(best, d[i - w - 1] + B);
+        if (x + 1 < w) best = Math.min(best, d[i - w + 1] + B);
+      }
+      d[i] = best;
+    }
+  }
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      if (d[i] === 0) continue;
+      let best = d[i];
+      if (x + 1 < w) best = Math.min(best, d[i + 1] + A);
+      if (y + 1 < h) {
+        best = Math.min(best, d[i + w] + A);
+        if (x + 1 < w) best = Math.min(best, d[i + w + 1] + B);
+        if (x > 0) best = Math.min(best, d[i + w - 1] + B);
+      }
+      d[i] = best;
+    }
+  }
+  return d;
+}
+
+// Zhang-Suen 细化：把笔画缩减为 1 像素宽的中心线
+function zhangSuen(mask, w, h) {
+  const W2 = w + 2;
+  const p = new Uint8Array(W2 * (h + 2));
+  for (let y = 0; y < h; y++) {
+    const src = y * w, dst = (y + 1) * W2 + 1;
+    for (let x = 0; x < w; x++) p[dst + x] = mask[src + x] ? 1 : 0;
+  }
+  const del = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let step = 0; step < 2; step++) {
+      del.length = 0;
+      for (let y = 1; y <= h; y++) {
+        const base = y * W2;
+        for (let x = 1; x <= w; x++) {
+          const i = base + x;
+          if (!p[i]) continue;
+          const P2 = p[i - W2], P3 = p[i - W2 + 1], P4 = p[i + 1], P5 = p[i + W2 + 1],
+                P6 = p[i + W2], P7 = p[i + W2 - 1], P8 = p[i - 1], P9 = p[i - W2 - 1];
+          const B = P2 + P3 + P4 + P5 + P6 + P7 + P8 + P9;
+          if (B < 2 || B > 6) continue;
+          let A = 0;
+          if (P2 === 0 && P3 === 1) A++;
+          if (P3 === 0 && P4 === 1) A++;
+          if (P4 === 0 && P5 === 1) A++;
+          if (P5 === 0 && P6 === 1) A++;
+          if (P6 === 0 && P7 === 1) A++;
+          if (P7 === 0 && P8 === 1) A++;
+          if (P8 === 0 && P9 === 1) A++;
+          if (P9 === 0 && P2 === 1) A++;
+          if (A !== 1) continue;
+          if (step === 0) {
+            if (P2 * P4 * P6 !== 0 || P4 * P6 * P8 !== 0) continue;
+          } else {
+            if (P2 * P4 * P8 !== 0 || P2 * P6 * P8 !== 0) continue;
+          }
+          del.push(i);
+        }
+      }
+      if (del.length) {
+        for (let k = 0; k < del.length; k++) p[del[k]] = 0;
+        changed = true;
+      }
+    }
+  }
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const src = (y + 1) * W2 + 1, dst = y * w;
+    for (let x = 0; x < w; x++) out[dst + x] = p[src + x];
+  }
+  return out;
+}
+
+// 方向优先的贪心走线：在交叉点处继续直行，把骨架连成尽量长的笔画
+function traceSkeletonPaths(skel, w, h, minLen) {
+  const W2 = w + 2;
+  const grid = new Uint8Array(W2 * (h + 2));
+  for (let y = 0; y < h; y++) {
+    const src = y * w, dst = (y + 1) * W2 + 1;
+    for (let x = 0; x < w; x++) grid[dst + x] = skel[src + x] ? 1 : 0;
+  }
+  const NBO = [-W2 - 1, -W2, -W2 + 1, -1, 1, W2 - 1, W2, W2 + 1];
+  const unvisited = new Set();
+  const degree = new Map();
+  for (let i = 0; i < grid.length; i++) {
+    if (!grid[i]) continue;
+    let nb = 0;
+    for (let k = 0; k < 8; k++) if (grid[i + NBO[k]]) nb++;
+    degree.set(i, nb);
+    unvisited.add(i);
+  }
+  const nbCache = new Map();
+  const nbrs = (p) => {
+    let v = nbCache.get(p);
+    if (v) return v;
+    v = [];
+    for (let k = 0; k < 8; k++) { const q = p + NBO[k]; if (grid[q]) v.push(q); }
+    nbCache.set(p, v);
+    return v;
+  };
+
+  const rawPaths = [];
+  while (unvisited.size) {
+    let start = -1;
+    for (const p of unvisited) if (degree.get(p) === 1) { start = p; break; }   // 优先从笔画端点起步
+    if (start < 0) { for (const p of unvisited) if (p > start) start = p; }     // 纯闭环
+    unvisited.delete(start);
+    const path = [start];
+    let prev = -1, cur = start;
+    for (;;) {
+      const cands = [];
+      for (const q of nbrs(cur)) if (unvisited.has(q)) cands.push(q);
+      if (!cands.length) {
+        if (path.length > 3 && nbrs(cur).indexOf(start) >= 0) path.push(start); // 闭合成环
+        break;
+      }
+      let nxt;
+      if (prev < 0) nxt = cands[0];
+      else {
+        const cx2 = cur % W2, cy2 = (cur / W2) | 0;
+        const dx = cx2 - (prev % W2), dy = cy2 - ((prev / W2) | 0);
+        const dl = Math.hypot(dx, dy) || 1;
+        let best = -Infinity;
+        for (const q of cands) {                       // 选最接近原方向的邻居
+          const vx = (q % W2) - cx2, vy = ((q / W2) | 0) - cy2;
+          const sc = (dx * vx + dy * vy) / (dl * (Math.hypot(vx, vy) || 1));
+          if (sc > best) { best = sc; nxt = q; }
+        }
+      }
+      unvisited.delete(nxt);
+      path.push(nxt);
+      prev = cur; cur = nxt;
+    }
+    if (path.length >= minLen) rawPaths.push(path);
+  }
+
+  // 端点缝合：骨架化偶尔会留下 1~2 像素的断裂，把首尾相邻的路径接起来
+  const tol2 = Math.pow(Math.max(2, Math.max(w, h) * 0.006), 2);
+  const gap2 = (p, q) => {
+    const dx = (p % W2) - (q % W2), dy = ((p / W2) | 0) - ((q / W2) | 0);
+    return dx * dx + dy * dy;
+  };
+  let merged = true;
+  while (merged) {
+    merged = false;
+    for (let i = 0; i < rawPaths.length && !merged; i++) {
+      const A = rawPaths[i];
+      for (let j = 0; j < rawPaths.length; j++) {
+        if (i === j) continue;
+        const B = rawPaths[j];
+        let joined = null;
+        if (gap2(A[A.length - 1], B[0]) <= tol2) joined = A.concat(B.slice(1));
+        else if (gap2(A[A.length - 1], B[B.length - 1]) <= tol2) joined = A.concat(B.slice(0, -1).reverse());
+        else if (gap2(A[0], B[0]) <= tol2) joined = A.slice().reverse().concat(B.slice(1));
+        else if (gap2(A[0], B[B.length - 1]) <= tol2) joined = B.concat(A.slice(1));
+        if (joined) {
+          rawPaths[i] = joined;
+          rawPaths.splice(j, 1);
+          merged = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // 转坐标：闭合环保持闭合；开放笔画用「去程 + 回程」闭合，不产生多余连线
+  const out = [];
+  for (const path of rawPaths) {
+    const coords = path.map(p => ({ x: (p % W2) - 1, y: ((p / W2) | 0) - 1 }));
+    if (path[0] === path[path.length - 1] || gap2(path[0], path[path.length - 1]) <= tol2) {
+      if (path[0] !== path[path.length - 1]) coords.push({ x: coords[0].x, y: coords[0].y });
+      out.push(coords);
+    } else {
+      const full = coords.slice();
+      for (let i = coords.length - 2; i > 0; i--) full.push(coords[i]);
+      out.push(full);
+    }
+  }
+  out.sort((a, b) => b.length - a.length);
+  return out;
+}
+
+function extractLinePaths(raw, w, h) {
+  const skel = zhangSuen(raw, w, h);
+  // 丢弃过短的碎片（骨架化产生的毛刺/噪点）；阈值随分辨率轻微缩放
+  const minLen = Math.max(10, Math.round(Math.max(w, h) * 0.012));
+  const eps = Math.max(0.6, Math.max(w, h) / 750);
+  return traceSkeletonPaths(skel, w, h, minLen)
+    .slice(0, maxContours)
+    .map(p => ({ pts: smoothPoints(simplifyDP(p, eps), 1) }));
+}
+
+// 统一入口：按识别方式返回 { paths, sampleN, mode }
+function extractPaths(img, mode) {
+  const { mask, w, h } = buildForeground(img);
+  let useLine = (mode === 'line');
+  if (mode === 'auto') {
+    // 细笔画（线稿）→ 中心线模式；实心大块 → 轮廓模式
+    const dist = chamferDistance(mask, w, h);
+    let thick = 0, fgCount = 0;
+    for (let i = 0; i < mask.length; i++) {
+      if (!mask[i]) continue;
+      fgCount++;
+      if (dist[i] > 6) thick++;
+    }
+    useLine = fgCount > 0 && (thick / fgCount) < 0.25;
+  }
+  if (useLine) return { paths: extractLinePaths(mask, w, h), sampleN: LINE_SAMPLE_N, mode: 'line' };
+  return { paths: extractContourPaths(mask, w, h), sampleN: SAMPLE_N, mode: 'contour' };
+}
+
+// Moore 邻域边界追踪：返回有序闭合轮廓点
+function traceMoore(mask, w, h) {
+  let start = -1;
+  for (let i = 0; i < w * h; i++) if (mask[i]) { start = i; break; }
+  if (start < 0) return null;
+  const sx = start % w, sy = (start / w) | 0;
+  // 顺时针 8 邻域：W, NW, N, NE, E, SE, S, SW
+  const offs = [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]];
+  const DIR = new Int8Array(9).fill(-1);
+  offs.forEach(([dx, dy], i) => { DIR[(dy + 1) * 3 + (dx + 1)] = i; });
+  const dirIdx = (dx, dy) => DIR[(dy + 1) * 3 + (dx + 1)];
+  const isFg = (x, y) => x >= 0 && y >= 0 && x < w && y < h && mask[y * w + x];
+
+  const path = [{ x: sx, y: sy }];
+  let cur = { x: sx, y: sy };
+  let back = { x: sx - 1, y: sy };
+  let enter = dirIdx(back.x - cur.x, back.y - cur.y);
+  if (enter < 0) enter = 0;
+  const maxIter = w * h * 4 + 64;
+  for (let guard = 0; guard < maxIter; guard++) {
+    let next = null;
+    for (let k = 1; k <= 8; k++) {
+      const idx = (enter + k) % 8;
+      const nx = cur.x + offs[idx][0], ny = cur.y + offs[idx][1];
+      if (isFg(nx, ny)) {
+        next = { x: nx, y: ny };
+        const bi = (enter + k - 1) % 8;
+        back = { x: cur.x + offs[bi][0], y: cur.y + offs[bi][1] };
+        break;
+      }
+    }
+    if (!next) break;
+    if (next.x === sx && next.y === sy && path.length > 2) { path.push(next); break; }
+    path.push(next);
+    // 关键：把「来向」换算到新像素的坐标系，否则行走方向会错乱并原地打转
+    const d = dirIdx(back.x - next.x, back.y - next.y);
+    if (d >= 0) enter = d;
+    cur = next;
+  }
+  return path;
+}
+
+function simplifyDP(points, eps) {
+  if (points.length < 3) return points.slice();
+  const keep = new Uint8Array(points.length);
+  keep[0] = keep[points.length - 1] = 1;
+  const stack = [[0, points.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    const ax = points[a].x, ay = points[a].y;
+    const dx = points[b].x - ax, dy = points[b].y - ay;
+    const len2 = dx * dx + dy * dy || 1;
+    let maxD = 0, maxI = -1;
+    for (let i = a + 1; i < b; i++) {
+      const tt = ((points[i].x - ax) * dx + (points[i].y - ay) * dy) / len2;
+      const tc = Math.max(0, Math.min(1, tt));
+      const px = ax + dx * tc, py = ay + dy * tc;
+      const d = (points[i].x - px) * (points[i].x - px) + (points[i].y - py) * (points[i].y - py);
+      if (d > maxD) { maxD = d; maxI = i; }
+    }
+    if (maxI >= 0 && maxD > eps * eps) {
+      keep[maxI] = 1;
+      stack.push([a, maxI], [maxI, b]);
+    }
+  }
+  return points.filter((_, i) => keep[i]);
+}
+
+function smoothPoints(pts, passes) {
+  let cur = pts;
+  for (let p = 0; p < passes; p++) {
+    const next = [];
+    for (let i = 0; i < cur.length; i++) {
+      const prev = cur[(i - 1 + cur.length) % cur.length];
+      const mid = cur[i];
+      const nx = cur[(i + 1) % cur.length];
+      next.push({ x: (prev.x + 2 * mid.x + nx.x) / 4, y: (prev.y + 2 * mid.y + nx.y) / 4 });
+    }
+    cur = next;
+  }
+  return cur;
+}
+
+// ============================================================
+//  导出：GIF（离线渲染） / WebM 视频（实时录制）
+// ============================================================
+function updateExportOptions() {
+  const isGif = document.querySelector('input[name="fmt"]:checked').value === 'gif';
+  const resList = isGif ? [[360, '360p'], [480, '480p']] : [[480, '480p'], [720, '720p'], [1080, '1080p']];
+  const curR = expRes.value;
+  expRes.innerHTML = resList.map(([v, l]) =>
+    `<option value="${v}" ${String(v) === curR ? 'selected' : ''}>${l}</option>`).join('');
+  const fpsList = [12, 20, 25, 30].concat(isGif ? [] : [50, 60]);
+  const curF = expFps.value;
+  expFps.innerHTML = fpsList.map(f =>
+    `<option value="${f}" ${String(f) === curF ? 'selected' : ''}>${f} fps</option>`).join('');
+  expNote.textContent = isGif
+    ? 'GIF 时长约 6 秒（含结尾停顿），纯本地生成，无需联网'
+    : 'WebM 为实时录制（约 6 秒），导出期间请保持页面打开，需要 Chrome / Edge / Firefox';
+}
+document.querySelectorAll('input[name="fmt"]').forEach(r => r.addEventListener('change', updateExportOptions));
+updateExportOptions();
+
+btnExport.addEventListener('click', () => {
+  if (videoMode) return;
+  exportOverlay.classList.add('show');
+});
+document.getElementById('expCancel').addEventListener('click', () => exportOverlay.classList.remove('show'));
+document.getElementById('expStart').addEventListener('click', () => {
+  if (drawing || !shapes.length) {
+    alert('请先选择一个预设图案、上传图片或完成手绘。');
+    return;
+  }
+  const isGif = document.querySelector('input[name="fmt"]:checked').value === 'gif';
+  const res = parseInt(expRes.value, 10);
+  const fps = parseInt(expFps.value, 10);
+  exportOverlay.classList.remove('show');
+  if (isGif) saveGIF(res, fps);
+  else startVideoExport(res, fps);
+});
+
+function setBusy(on, text, cancelable) {
+  overlay.classList.toggle('show', on);
+  if (text) overlayText.textContent = text;
+  btnCancelRec.style.display = (on && cancelable) ? 'inline-block' : 'none';
+  if (!on) progressBar.style.width = '0%';
+}
+function setProgress(f) { progressBar.style.width = (f * 100).toFixed(1) + '%'; }
+const tick = () => new Promise(r => setTimeout(r, 0));
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// ---------- GIF 编码器（LZW 压缩 + 中位切分调色板） ----------
+function medianCut(pixels, maxColors) {
+  const boxes = [pixels.slice()];
+  while (boxes.length < maxColors) {
+    let bi = -1, bestRange = -1, bestCh = 0;
+    for (let b = 0; b < boxes.length; b++) {
+      const box = boxes[b];
+      if (box.length < 2) continue;
+      let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
+      for (let i = 0; i < box.length; i++) {
+        const p = box[i];
+        if (p[0] < minR) minR = p[0]; if (p[0] > maxR) maxR = p[0];
+        if (p[1] < minG) minG = p[1]; if (p[1] > maxG) maxG = p[1];
+        if (p[2] < minB) minB = p[2]; if (p[2] > maxB) maxB = p[2];
+      }
+      const rR = maxR - minR, rG = maxG - minG, rB = maxB - minB;
+      let range, ch;
+      if (rR >= rG && rR >= rB) { range = rR; ch = 0; }
+      else if (rG >= rB) { range = rG; ch = 1; }
+      else { range = rB; ch = 2; }
+      if (range > bestRange) { bestRange = range; bi = b; bestCh = ch; }
+    }
+    if (bi < 0) break;
+    const box = boxes[bi];
+    box.sort((a, b) => a[bestCh] - b[bestCh]);
+    const mid = box.length >> 1;
+    boxes.splice(bi, 1, box.slice(0, mid), box.slice(mid));
+  }
+  return boxes.map(box => {
+    let r = 0, g = 0, bl = 0;
+    for (const p of box) { r += p[0]; g += p[1]; bl += p[2]; }
+    const n = box.length || 1;
+    return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(bl / n) };
+  });
+}
+function buildMap(palette) {
+  const cache = new Uint8Array(32768);
+  for (let r5 = 0; r5 < 32; r5++) for (let g5 = 0; g5 < 32; g5++) for (let b5 = 0; b5 < 32; b5++) {
+    const r = (r5 << 3) | (r5 >> 2), g = (g5 << 3) | (g5 >> 2), b = (b5 << 3) | (b5 >> 2);
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < palette.length; i++) {
+      const p = palette[i];
+      const dr = r - p.r, dg = g - p.g, db = b - p.b;
+      const d = dr * dr + dg * dg + db * db;
+      if (d < bd) { bd = d; best = i; }
+    }
+    cache[(r5 << 10) | (g5 << 5) | b5] = best;
+  }
+  return cache;
+}
+function mapPixels(rgba, cache) {
+  const idx = new Uint8Array(rgba.length / 4);
+  for (let i = 0, j = 0; i < rgba.length; i += 4, j++) {
+    const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+    idx[j] = cache[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)];
+  }
+  return idx;
+}
+function collectSample(frames, maxPixels) {
+  const total = frames.length * (frames[0].length / 4);
+  const step = Math.max(1, Math.floor(total / maxPixels));
+  const sample = [];
+  for (const f of frames) {
+    for (let i = 0; i < f.length; i += 4 * step) sample.push([f[i], f[i + 1], f[i + 2]]);
+  }
+  return sample;
+}
+function lzwEncode(indices, minCodeSize) {
+  const clearCode = 1 << minCodeSize;
+  const endCode = clearCode + 1;
+  let codeSize = minCodeSize + 1;
+  let nextCode = endCode + 1;
+  const out = [];
+  let cur = 0, curBits = 0;
+  function writeCode(code) {
+    cur |= code << curBits;
+    curBits += codeSize;
+    while (curBits >= 8) { out.push(cur & 0xff); cur >>>= 8; curBits -= 8; }
+  }
+  writeCode(clearCode);
+  const table = new Int32Array(1 << 20);
+  table.fill(-1);
+  let prev = indices[0];
+  for (let i = 1; i < indices.length; i++) {
+    const byte = indices[i];
+    const key = (prev << 8) | byte;
+    const found = table[key];
+    if (found !== -1) {
+      prev = found;
+    } else {
+      writeCode(prev);
+      if (nextCode < 4096) {
+        table[key] = nextCode++;
+        // 编码器字典比解码器领先一条，码长切换点需晚一个码值
+        if (nextCode === (1 << codeSize) + 1 && codeSize < 12) codeSize++;
+      } else {
+        writeCode(clearCode);
+        table.fill(-1);
+        codeSize = minCodeSize + 1;
+        nextCode = endCode + 1;
+      }
+      prev = byte;
+    }
+  }
+  writeCode(prev);
+  writeCode(endCode);
+  if (curBits > 0) out.push(cur & 0xff);
+  return out;
+}
+function assembleGIF(frameIndices, palette, w, h, delayCs, loop) {
+  const bytes = [];
+  const push = (arr) => { for (let i = 0; i < arr.length; i++) bytes.push(arr[i]); };
+  push([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+  push([w & 0xff, (w >> 8) & 0xff, h & 0xff, (h >> 8) & 0xff]);
+  push([0xF7, 0x00, 0x00]);
+  for (let i = 0; i < 256; i++) {
+    const p = palette[i] || { r: 0, g: 0, b: 0 };
+    push([p.r, p.g, p.b]);
+  }
+  if (loop) {
+    push([0x21, 0xFF, 0x0B]);
+    push(Array.from('NETSCAPE2.0', c => c.charCodeAt(0)));
+    push([0x03, 0x01, 0x00, 0x00, 0x00]);
+  }
+  for (const idx of frameIndices) {
+    push([0x21, 0xF9, 0x04, 0x04, delayCs & 0xff, (delayCs >> 8) & 0xff, 0x00, 0x00]);
+    push([0x2C, 0x00, 0x00, 0x00, 0x00, w & 0xff, (w >> 8) & 0xff, h & 0xff, (h >> 8) & 0xff, 0x00]);
+    push([8]);
+    const lzw = lzwEncode(idx, 8);
+    for (let i = 0; i < lzw.length; i += 255) {
+      const chunk = lzw.slice(i, i + 255);
+      push([chunk.length]);
+      push(chunk);
+    }
+    push([0x00]);
+  }
+  push([0x3B]);
+  return new Uint8Array(bytes);
+}
+
+// 把多条线在相位 tt、轨迹截取到 idx 的一帧画到离屏 view 上
+function renderFrame(view, tt, fullPaths, idx) {
+  const g = view.ctx;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.fillStyle = '#0d1322';
+  g.fillRect(0, 0, view.W, view.H);
+  paintShapes(view, tt, fullPaths.map(fp => fp.slice(0, idx + 1)));
+}
+
+async function saveGIF(targetW, fps) {
+  const REC_W = targetW;
+  const REC_H = Math.max(120, Math.round(REC_W * (H / W)));
+  const M = Math.max(8, Math.round(fps * GIF_LOOP_SEC));
+  const HOLD = Math.round(fps * 0.4);
+  const DELAY = Math.max(2, Math.round(100 / fps));
+
+  setBusy(true, '正在渲染帧…');
+  try {
+    await tick();
+    const off = document.createElement('canvas');
+    off.width = REC_W; off.height = REC_H;
+    const g = off.getContext('2d');
+    const view = { ctx: g, W: REC_W, H: REC_H, cx: REC_W / 2, cy: REC_H / 2, scale: Math.min(REC_W, REC_H) * 0.30 };
+
+    const F = 600;
+    const fullPaths = shapes.map(s => computeFullPath(s.active, F));
+
+    const rawFrames = [];
+    for (let m = 0; m < M; m++) {
+      const tt = m / (M - 1);
+      const idx = Math.round(tt * F);
+      renderFrame(view, tt, fullPaths, idx);
+      rawFrames.push(new Uint8Array(g.getImageData(0, 0, REC_W, REC_H).data));
+      setProgress(0.35 * m / M);
+      if (m % 8 === 0) await tick();
+    }
+
+    overlayText.textContent = '正在量化颜色…';
+    setProgress(0.4); await tick();
+    const sample = collectSample(rawFrames, 40000);
+    const palette = medianCut(sample, 256);
+    const cache = buildMap(palette);
+
+    overlayText.textContent = '正在编码 GIF…';
+    const indices = [];
+    for (let i = 0; i < rawFrames.length; i++) {
+      indices.push(mapPixels(rawFrames[i], cache));
+      rawFrames[i] = null;
+      setProgress(0.45 + 0.45 * (i + 1) / rawFrames.length);
+      if (i % 8 === 0) await tick();
+    }
+    for (let k = 0; k < HOLD; k++) indices.push(indices[indices.length - 1]);
+
+    overlayText.textContent = '正在生成文件…';
+    setProgress(0.97); await tick();
+    const gif = assembleGIF(indices, palette, REC_W, REC_H, DELAY, true);
+    downloadBlob(new Blob([gif], { type: 'image/gif' }), 'fourier-epicycle.gif');
+  } catch (err) {
+    console.error(err);
+    alert('GIF 生成失败：' + err.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ---------- WebM 视频：实时录制主画布 ----------
+function startVideoExport(targetW, fps) {
+  if (!canvas.captureStream || !window.MediaRecorder) {
+    alert('当前浏览器不支持视频录制，请使用 Chrome / Edge / Firefox。');
+    return;
+  }
+  const targetH = Math.max(120, Math.round(targetW * (H / W)));
+  dpr = 1;
+  canvas.width = targetW;
+  canvas.height = targetH;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  Object.assign(mainView, { W: targetW, H: targetH, cx: targetW / 2, cy: targetH / 2, scale: Math.min(targetW, targetH) * 0.30 });
+
+  const F = 600;
+  videoMode = {
+    startTime: performance.now(),
+    fullPaths: shapes.map(s => computeFullPath(s.active, F)),
+    F
+  };
+
+  const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
+    .find(m => MediaRecorder.isTypeSupported(m)) || '';
+  const bitrate = { 480: 5e6, 720: 8e6, 1080: 12e6 }[targetW] || 8e6;
+  const stream = canvas.captureStream(fps);
+  const rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: bitrate });
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  vid = { rec, chunks, mime, cancelled: false };
+
+  rec.onstop = () => {
+    const v = vid;
+    vid = null; videoMode = null;
+    resize();
+    playing = true; updatePlayBtn();
+    setBusy(false);
+    if (v && !v.cancelled && v.chunks.length) {
+      const ext = (v.mime && v.mime.indexOf('mp4') >= 0) ? 'mp4' : 'webm';
+      downloadBlob(new Blob(v.chunks, { type: v.mime || 'video/webm' }), 'fourier-epicycle.' + ext);
+    }
+  };
+
+  rec.start(100);
+  playing = false; updatePlayBtn();
+  setBusy(true, '正在录制视频（实时，约 6 秒）…', true);
+}
+
+btnCancelRec.addEventListener('click', () => {
+  if (vid) { vid.cancelled = true; vid.rec.stop(); }
+});
+
+// ---------------- 启动 ----------------
+resize();
+setShapes(PRESETS.heart());
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
